@@ -1,5 +1,7 @@
 # もでコレ 🦙
 
+<p align="center"><b>日本語</b> ｜ <a href="README_EN.md">English</a></p>
+
 ## 「プロンプト設定したのに…なんで効かないの？」🤔
 
 Ollama でモデルのシステムプロンプトを書き換えて、OpenWebUI で開いたら **まったく反映されていない** ——

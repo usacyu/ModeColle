@@ -1,5 +1,7 @@
 # ModeColle 🦙
 
+<p align="center"><a href="README.md">日本語</a> ｜ <b>English</b></p>
+
 ## "I set the system prompt… so why isn't it working?" 🤔
 
 If you've ever edited a model's system prompt in Ollama, opened Open WebUI, and found your prompt **completely ignored** — you're not imagining it.
