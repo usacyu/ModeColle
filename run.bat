@@ -1,3 +1,3 @@
 @echo off
-python "%~dp0modekore.py"
+python "%~dp0ModeColle.py"
 if errorlevel 1 pause

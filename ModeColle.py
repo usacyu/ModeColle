@@ -9,6 +9,7 @@ import urllib.error
 import json
 import os
 import threading
+import customtkinter as ctk
 
 OLLAMA_BASE = "http://localhost:11434"
 OPENWEBUI_CONFIG_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "openwebui_config.json")
@@ -24,6 +25,13 @@ TR = {
         "refresh": "🔄 更新",
         "legend_dup": "■ 同じハッシュ = 同じ実体（重複）",
         "legend_owui": "🌐 = OpenWebUI側にもプロンプト設定済み",
+        "search_ph": "モデルを検索…",
+        "legend_hint": "🌐 = OpenWebUI同期済み　／　色付き＝中身が重複",
+        "empty_detail": "← 左の一覧からモデルを選んでね",
+        "ready": "準備OK",
+        "lbl_owui_row": "🌐 OpenWebUI",
+        "owui_yes": "同期済み",
+        "owui_no": "未設定",
         "list_title": "登録モデル一覧",
         "col_name": "モデル名",
         "col_size": "容量",
@@ -124,12 +132,19 @@ TR = {
         "rename_failed": "リネーム失敗",
     },
     "en": {
-        "app_title": "Modekore 🦙",
-        "brand": "🦙 Modekore",
+        "app_title": "ModeColle 🦙",
+        "brand": "🦙 ModeColle",
         "lang_button": "🌐 日本語",
         "refresh": "🔄 Refresh",
         "legend_dup": "■ Same hash = same data (duplicate)",
         "legend_owui": "🌐 = Prompt also set on OpenWebUI",
+        "search_ph": "Search models…",
+        "legend_hint": "🌐 = synced to OpenWebUI  /  tinted = duplicate content",
+        "empty_detail": "← Pick a model from the list",
+        "ready": "Ready",
+        "lbl_owui_row": "🌐 OpenWebUI",
+        "owui_yes": "Synced",
+        "owui_no": "Not set",
         "list_title": "Installed models",
         "col_name": "Model name",
         "col_size": "Size",
@@ -239,7 +254,7 @@ def t(key, **kw):
 
 # モデル名キーワード → 用途（言語別）/ model-name keyword -> use case (per language)
 USE_CASES = {
-    "maine":     {"ja": "🗣️ 日常会話メイン・日本語お姉さんキャラ・こふでくんサポート",
+    "maine":     {"ja": "🗣️ 日常会話メイン・日本語お姉さんキャラ・パーソナルアシスタント",
                   "en": "🗣️ Everyday conversation / friendly assistant persona"},
     "magnum":    {"ja": "✍️ クリエイティブライティング・ストーリー・キャラクター会話・プロンプト生成",
                   "en": "✍️ Creative writing / stories / character chat / prompt generation"},
@@ -418,155 +433,150 @@ def openwebui_update_system_prompt(model_id: str, system: str):
     return _openwebui_request("/api/v1/models/model/update", method="POST", data=target)
 
 
-# ── カラーパレット (Catppuccin Mocha) ─────────────────────────────────────
-BG      = "#1e1e2e"
-SURFACE = "#313244"
-OVERLAY = "#45475a"
-TEXT    = "#cdd6f4"
-SUBTEXT = "#bac2de"
-BLUE    = "#89b4fa"
-GREEN   = "#a6e3a1"
-YELLOW  = "#f9e2af"
-RED     = "#f38ba8"
-MAUVE   = "#cba6f7"
-TEAL    = "#94e2d5"
-PEACH   = "#fab387"
-PINK    = "#f5c2e7"
+# ── 配色（ぷろんぷたん family: 白基調・パステル・角丸） ───────────────────
+ctk.set_appearance_mode("light")
+
+WIN_BG    = "#faf6fb"
+CARD      = "#ffffff"
+BORDER    = "#ece4f0"
+TXT       = "#3d3447"
+TXT_MUT   = "#9a8ea6"
+TXT_HINT  = "#bcb1c6"
+PINK      = "#ec86b0"
+PINK_HOV  = "#e3719f"
+PINK_TXT  = "#7c2b50"
+PINK_SOFT = "#fdeaf2"
+PINK_FLASH = "#fbeef5"
+LAV       = "#a98fe0"
+LAV_HOV   = "#efe9fb"
+LAV_TXT   = "#6f54bf"
+RED       = "#e06d6d"
+RED_HOV   = "#fbeaea"
+RED_BD    = "#eeb4b4"
+GHOST_BD  = "#e6dcec"
+GHOST_HOV = "#f4eef7"
+CHIP_BG   = "#e9f1fc"
+CHIP_TX   = "#3f72b0"
+OK_GREEN  = "#3a9e78"
+WARN_AMBER = "#c98a2a"
+
+DUP_TINTS = ["#f3edfb", "#e9f6ef", "#fdeef1", "#fef6e6", "#eaf2fb"]
 
 
-class ModelfileEditor(tk.Toplevel):
-    """派生登録・プロンプト編集 共通ダイアログ"""
+class ModelfileEditor(ctk.CTkToplevel):
+    """派生登録・プロンプト編集 共通ダイアログ（CustomTkinter）"""
 
-    def __init__(self, parent, title: str, model_names: list,
-                 default_base: str = "", default_name: str = "",
-                 default_prompt: str = "", on_save=None, base_readonly: bool = False,
-                 lock_to_ollama: bool = False):
+    def __init__(self, parent, title, model_names, default_base="", default_name="",
+                 default_prompt="", on_save=None, base_readonly=False, lock_to_ollama=False):
         super().__init__(parent)
         self.title(title)
-        self.configure(bg=BG)
-        self.geometry("720x620")
-        self.minsize(600, 500)
-        self.resizable(True, True)
-        self.grab_set()  # モーダル
-
+        self.configure(fg_color=WIN_BG)
+        self.geometry("680x640")
+        self.minsize(560, 520)
+        self.update_idletasks()
+        try:
+            px, py = parent.winfo_rootx(), parent.winfo_rooty()
+            pw, ph = parent.winfo_width(), parent.winfo_height()
+            self.geometry(f"680x640+{px + (pw - 680) // 2}+{py + (ph - 640) // 2}")
+        except Exception:
+            pass
         self.on_save = on_save
         self.result = None
-
+        self._base_readonly = base_readonly
+        self._base_fixed = default_base
+        self._lock_to_ollama = lock_to_ollama
         self._build(model_names, default_base, default_name, default_prompt,
                     base_readonly, lock_to_ollama)
+        self.transient(parent)
+        self.after(60, self._grab)
 
-    def _lbl(self, parent, text, fg=TEXT, font=None, **kw):
-        return tk.Label(parent, text=text, bg=BG, fg=fg,
-                        font=font or ("Yu Gothic UI", 10), **kw)
-
-    def _chk(self, parent, text, var, enabled=True):
-        cb = tk.Checkbutton(
-            parent, text=text, variable=var,
-            bg=BG, fg=TEXT, selectcolor=SURFACE,
-            activebackground=BG, activeforeground=TEXT,
-            font=("Yu Gothic UI", 10), relief="flat",
-            highlightthickness=0
-        )
-        if not enabled:
-            cb.configure(state="disabled")
-        return cb
+    def _grab(self):
+        try:
+            self.grab_set()
+            self.lift()
+            self.focus_force()
+        except Exception:
+            pass
 
     def _build(self, model_names, default_base, default_name, default_prompt,
-               base_readonly=False, lock_to_ollama=False):
-        s = ttk.Style()
-        s.configure("DlgOK.TButton",     background=GREEN,  foreground=BG, padding=(10, 5))
-        s.map("DlgOK.TButton",           background=[("active", TEAL)])
-        s.configure("DlgCancel.TButton", background=OVERLAY, foreground=TEXT, padding=(10, 5))
-        s.map("DlgCancel.TButton",       background=[("active", "#585b70")])
+               base_readonly, lock_to_ollama):
+        fb = ctk.CTkFont("Yu Gothic UI", 12, "bold")
+        fn = ctk.CTkFont("Yu Gothic UI", 11)
+        wrap = ctk.CTkFrame(self, fg_color="transparent")
+        wrap.pack(fill="both", expand=True, padx=18, pady=16)
 
-        # ボタンを先にbottomで確保（expand=Trueのウィジェットに押し出されないように）
-        btn_row = ttk.Frame(self)
-        btn_row.pack(side="bottom", fill="x", padx=16, pady=12)
-        ttk.Button(btn_row, text=t("dlg_ok"), style="DlgOK.TButton",
-                   command=self._ok).pack(side="right", padx=(6, 0))
-        ttk.Button(btn_row, text=t("dlg_cancel"), style="DlgCancel.TButton",
-                   command=self.destroy).pack(side="right")
-
-        # ベースモデル選択
-        row1 = ttk.Frame(self)
-        row1.pack(fill="x", padx=16, pady=(12, 4))
-        self._base_readonly = base_readonly
-        self._base_fixed = default_base  # readonly時はこの値を使う
+        # ベースモデル（元の名前）は常に大きく明示する
+        ctk.CTkLabel(wrap, text=(t("dlg_base_auto") if base_readonly else t("dlg_base")),
+                     font=fb, text_color=LAV_TXT, anchor="w").pack(fill="x")
         if base_readonly:
-            self._lbl(row1, t("dlg_base_auto"), fg=BLUE,
-                      font=("Yu Gothic UI", 10, "bold")).pack(anchor="w")
-            self._lbl(row1, default_base[:90] + ("..." if len(default_base) > 90 else ""),
-                      fg=SUBTEXT, font=("Yu Gothic UI", 9)).pack(anchor="w", pady=(2, 0))
+            box = ctk.CTkFrame(wrap, fg_color=PINK_SOFT, corner_radius=10)
+            box.pack(fill="x", pady=(4, 10))
+            ctk.CTkLabel(box, text=default_base, font=ctk.CTkFont("Yu Gothic UI", 13, "bold"),
+                         text_color=PINK_TXT, anchor="w", justify="left",
+                         wraplength=560).pack(fill="x", padx=12, pady=8)
             self.cb = None
         else:
-            self._lbl(row1, t("dlg_base"), fg=BLUE,
-                      font=("Yu Gothic UI", 10, "bold")).pack(anchor="w")
-            self.cb = ttk.Combobox(row1, values=model_names, state="readonly", width=50)
-            self.cb.pack(fill="x", pady=(4, 0))
-            # 描画完了後に選択を反映（after で遅延させないと表示されない）
-            if default_base in model_names:
-                idx = model_names.index(default_base)
-                self.after(50, lambda: self.cb.current(idx))
+            self.cb = ctk.CTkComboBox(wrap, values=model_names, state="readonly", font=fn,
+                                      fg_color=CARD, border_color=BORDER, button_color=LAV,
+                                      button_hover_color=LAV_TXT, dropdown_fg_color=CARD,
+                                      text_color=TXT, corner_radius=10)
+            self.cb.pack(fill="x", pady=(4, 10))
+            self.cb.set(default_base if default_base in model_names else "")
 
-        # 新しいモデル名
-        row2 = ttk.Frame(self)
-        row2.pack(fill="x", padx=16, pady=(0, 8))
-        self._lbl(row2, t("dlg_newname"), fg=BLUE,
-                  font=("Yu Gothic UI", 10, "bold")).pack(anchor="w")
+        ctk.CTkLabel(wrap, text=t("dlg_newname"), font=fb, text_color=LAV_TXT,
+                     anchor="w").pack(fill="x")
         self.name_var = tk.StringVar(value=default_name)
-        tk.Entry(row2, textvariable=self.name_var, bg=SURFACE, fg=TEXT,
-                 insertbackground=TEXT, relief="flat", font=("Yu Gothic UI", 10),
-                 width=50).pack(fill="x", pady=(4, 0))
+        ctk.CTkEntry(wrap, textvariable=self.name_var, font=fn, fg_color=CARD,
+                     border_color=BORDER, text_color=TXT, corner_radius=10,
+                     height=34).pack(fill="x", pady=(4, 10))
 
-        # 保存先（Ollama / OpenWebUI）
-        row_dest = ttk.Frame(self)
-        row_dest.pack(fill="x", padx=16, pady=(0, 8))
-        self._lbl(row_dest, t("dlg_dest"), fg=BLUE,
-                  font=("Yu Gothic UI", 10, "bold")).pack(anchor="w")
-
-        self.var_to_ollama    = tk.BooleanVar(value=True)
+        ctk.CTkLabel(wrap, text=t("dlg_dest"), font=fb, text_color=LAV_TXT,
+                     anchor="w").pack(fill="x")
+        self.var_to_ollama = tk.BooleanVar(value=True)
         self.var_to_openwebui = tk.BooleanVar(value=False)
-        self._lock_to_ollama  = lock_to_ollama
-
-        dest_row = ttk.Frame(row_dest)
-        dest_row.pack(fill="x", pady=(2, 0))
-        self._chk(dest_row, t("dlg_to_ollama"), self.var_to_ollama,
-                  enabled=not lock_to_ollama).pack(side="left", padx=(0, 18))
-        self._chk(dest_row, t("dlg_to_owui"), self.var_to_openwebui).pack(side="left")
-
+        drow = ctk.CTkFrame(wrap, fg_color="transparent")
+        drow.pack(fill="x", pady=(4, 2))
+        c1 = ctk.CTkCheckBox(drow, text=t("dlg_to_ollama"), variable=self.var_to_ollama,
+                             font=fn, text_color=TXT, fg_color=PINK, hover_color=PINK_HOV,
+                             border_color=LAV)
+        c1.pack(side="left", padx=(0, 18))
         if lock_to_ollama:
-            self._lbl(row_dest, t("dlg_lock_note"),
-                      fg=SUBTEXT, font=("Yu Gothic UI", 9)).pack(anchor="w", pady=(2, 0))
+            c1.configure(state="disabled")
+        ctk.CTkCheckBox(drow, text=t("dlg_to_owui"), variable=self.var_to_openwebui,
+                        font=fn, text_color=TXT, fg_color=PINK, hover_color=PINK_HOV,
+                        border_color=LAV).pack(side="left")
+        if lock_to_ollama:
+            ctk.CTkLabel(wrap, text=t("dlg_lock_note"), font=fn, text_color=TXT_MUT,
+                         anchor="w").pack(fill="x", pady=(2, 6))
 
-        # システムプロンプト（残りスペースをすべて使う）
-        row3 = ttk.Frame(self)
-        row3.pack(fill="both", expand=True, padx=16, pady=(0, 4))
-        self._lbl(row3, t("dlg_system"), fg=BLUE,
-                  font=("Yu Gothic UI", 10, "bold")).pack(anchor="w")
-        self._lbl(row3, t("dlg_system_hint"), fg=SUBTEXT,
-                  font=("Yu Gothic UI", 9)).pack(anchor="w")
-
-        txt_frame = ttk.Frame(row3)
-        txt_frame.pack(fill="both", expand=True, pady=(4, 0))
-        self.prompt_txt = tk.Text(
-            txt_frame, wrap="word", bg=SURFACE, fg=TEXT,
-            font=("Yu Gothic UI", 10), relief="flat", padx=8, pady=8,
-            insertbackground=TEXT, selectbackground=OVERLAY, undo=True
-        )
-        vsb = ttk.Scrollbar(txt_frame, orient="vertical", command=self.prompt_txt.yview)
-        self.prompt_txt.configure(yscrollcommand=vsb.set)
-        self.prompt_txt.pack(side="left", fill="both", expand=True)
-        vsb.pack(side="right", fill="y")
+        ctk.CTkLabel(wrap, text=t("dlg_system"), font=fb, text_color=LAV_TXT,
+                     anchor="w").pack(fill="x", pady=(8, 0))
+        ctk.CTkLabel(wrap, text=t("dlg_system_hint"), font=fn, text_color=TXT_MUT,
+                     anchor="w").pack(fill="x")
+        self.prompt_txt = ctk.CTkTextbox(wrap, font=ctk.CTkFont("Yu Gothic UI", 12),
+                                         fg_color=CARD, border_color=BORDER, border_width=1,
+                                         text_color=TXT, wrap="word", corner_radius=10)
+        self.prompt_txt.pack(fill="both", expand=True, pady=(4, 12))
         if default_prompt:
             self.prompt_txt.insert("1.0", default_prompt)
 
-    def _ok(self):
-        base   = self._base_fixed if self._base_readonly else (self.cb.get().strip() if self.cb else "")
-        name   = self.name_var.get().strip()
-        prompt = self.prompt_txt.get("1.0", "end").strip()
-        to_ollama    = True if self._lock_to_ollama else self.var_to_ollama.get()
-        to_openwebui = self.var_to_openwebui.get()
+        brow = ctk.CTkFrame(wrap, fg_color="transparent")
+        brow.pack(fill="x")
+        ctk.CTkButton(brow, text=t("dlg_ok"), command=self._ok,
+                      font=ctk.CTkFont("Yu Gothic UI", 13, "bold"), fg_color=PINK,
+                      hover_color=PINK_HOV, text_color="#ffffff", corner_radius=20,
+                      height=40).pack(side="right", padx=(8, 0))
+        ctk.CTkButton(brow, text=t("dlg_cancel"), command=self.destroy,
+                      font=ctk.CTkFont("Yu Gothic UI", 13), fg_color="transparent",
+                      hover_color=GHOST_HOV, text_color=TXT_MUT, border_width=1,
+                      border_color=GHOST_BD, corner_radius=20, height=40).pack(side="right")
 
+    def _ok(self):
+        base = self._base_fixed if self._base_readonly else (self.cb.get().strip() if self.cb else "")
+        name = self.name_var.get().strip()
+        prompt = self.prompt_txt.get("1.0", "end").strip()
+        to_ollama = True if self._lock_to_ollama else self.var_to_ollama.get()
+        to_openwebui = self.var_to_openwebui.get()
         if not base:
             messagebox.showwarning(t("warn_input"), t("warn_need_base"), parent=self)
             return
@@ -576,198 +586,274 @@ class ModelfileEditor(tk.Toplevel):
         if not to_ollama and not to_openwebui:
             messagebox.showwarning(t("warn_select"), t("warn_need_dest"), parent=self)
             return
-
         self.result = (base, name, prompt, to_ollama, to_openwebui)
         if self.on_save:
             self.on_save(base, name, prompt, to_ollama, to_openwebui)
         self.destroy()
 
 
+class AskNameDialog(ctk.CTkToplevel):
+    """初期値を入れられるテーマ統一の入力ダイアログ。文字列 or None を返す。"""
+
+    def __init__(self, parent, title, body, default=""):
+        super().__init__(parent)
+        self.title(title)
+        self.configure(fg_color=WIN_BG)
+        self.geometry("470x250")
+        self.resizable(False, False)
+        self.result = None
+        self.update_idletasks()
+        try:
+            px, py = parent.winfo_rootx(), parent.winfo_rooty()
+            pw, ph = parent.winfo_width(), parent.winfo_height()
+            self.geometry(f"470x250+{px + (pw - 470) // 2}+{py + (ph - 250) // 2}")
+        except Exception:
+            pass
+        wrap = ctk.CTkFrame(self, fg_color="transparent")
+        wrap.pack(fill="both", expand=True, padx=18, pady=16)
+        ctk.CTkLabel(wrap, text=body, font=ctk.CTkFont("Yu Gothic UI", 11), text_color=TXT,
+                     anchor="w", justify="left", wraplength=430).pack(fill="x", pady=(0, 10))
+        self.var = tk.StringVar(value=default)
+        self.entry = ctk.CTkEntry(wrap, textvariable=self.var,
+                                  font=ctk.CTkFont("Yu Gothic UI", 12), fg_color=CARD,
+                                  border_color=BORDER, text_color=TXT, corner_radius=10,
+                                  height=36)
+        self.entry.pack(fill="x")
+        brow = ctk.CTkFrame(wrap, fg_color="transparent")
+        brow.pack(fill="x", pady=(16, 0))
+        ctk.CTkButton(brow, text="OK", command=self._ok,
+                      font=ctk.CTkFont("Yu Gothic UI", 13, "bold"), fg_color=PINK,
+                      hover_color=PINK_HOV, text_color="#ffffff", corner_radius=20,
+                      height=38, width=110).pack(side="right", padx=(8, 0))
+        ctk.CTkButton(brow, text="キャンセル", command=self._cancel,
+                      font=ctk.CTkFont("Yu Gothic UI", 13), fg_color="transparent",
+                      hover_color=GHOST_HOV, text_color=TXT_MUT, border_width=1,
+                      border_color=GHOST_BD, corner_radius=20, height=38, width=110).pack(side="right")
+        self.transient(parent)
+        self.bind("<Return>", lambda e: self._ok())
+        self.bind("<Escape>", lambda e: self._cancel())
+        self.after(60, self._post_init)
+
+    def _post_init(self):
+        try:
+            self.grab_set()
+            self.lift()
+            self.focus_force()
+            self.entry.focus_set()
+            self.entry._entry.select_range(0, "end")
+        except Exception:
+            pass
+
+    def _ok(self):
+        self.result = self.var.get().strip()
+        self.destroy()
+
+    def _cancel(self):
+        self.result = None
+        self.destroy()
+
+
+def copy_suggest(name):
+    """コピー/派生のたたき台名（元の名前の末尾に -copy）。"""
+    return f"{name}-copy"
+
+
+def ask_name(parent, title, body, default=""):
+    dlg = AskNameDialog(parent, title, body, default)
+    parent.wait_window(dlg)
+    return dlg.result
+
+
 class App:
-    def __init__(self, root: tk.Tk):
+    def __init__(self, root):
         self.root = root
         self.root.title(t("app_title"))
-        self.root.geometry("1200x760")
-        self.root.configure(bg=BG)
-        self.root.minsize(950, 620)
-
-        self.models: list = []
+        self.root.geometry("1140x760")
+        self.root.minsize(960, 640)
+        self.root.configure(fg_color=WIN_BG)
+        self.models = []
         self.selected_model = None
-        self.owui_prompt_set: set = set()  # OpenWebUI側でsystem promptが設定済みのモデルID
-
-        self._styles()
+        self.owui_prompt_set = set()
+        self.row_widgets = {}
+        self._fonts()
         self._build()
         self.refresh()
 
-    def _styles(self):
-        s = ttk.Style()
-        s.theme_use("clam")
-        s.configure(".",           background=BG,      foreground=TEXT,   font=("Yu Gothic UI", 10))
-        s.configure("TFrame",      background=BG)
-        s.configure("TLabel",      background=BG,      foreground=TEXT)
-        s.configure("TSeparator",  background=OVERLAY)
-        s.configure("TScrollbar",  background=SURFACE, troughcolor=BG,    arrowcolor=SUBTEXT)
-        s.configure("TCombobox",   fieldbackground=SURFACE, background=SURFACE,
-                    foreground=TEXT, selectbackground=OVERLAY)
-
-        s.configure("TButton",         background=SURFACE, foreground=TEXT,  padding=(8, 5), relief="flat")
-        s.map("TButton",               background=[("active", OVERLAY)])
-        s.configure("Danger.TButton",  background=RED,    foreground=BG,    padding=(8, 5))
-        s.map("Danger.TButton",        background=[("active", "#eba0ac")])
-        s.configure("Warn.TButton",    background=YELLOW, foreground=BG,    padding=(8, 5))
-        s.map("Warn.TButton",          background=[("active", "#f2cdcd")])
-        s.configure("Copy.TButton",    background=PEACH,  foreground=BG,    padding=(8, 5))
-        s.map("Copy.TButton",          background=[("active", "#f5c2a0")])
-        s.configure("New.TButton",     background=GREEN,  foreground=BG,    padding=(8, 5))
-        s.map("New.TButton",           background=[("active", TEAL)])
-        s.configure("Edit.TButton",    background=PINK,   foreground=BG,    padding=(8, 5))
-        s.map("Edit.TButton",          background=[("active", "#f2a8d8")])
-
-        s.configure("Treeview",
-                    background=SURFACE, fieldbackground=SURFACE,
-                    foreground=TEXT, rowheight=30, font=("Yu Gothic UI", 10))
-        s.configure("Treeview.Heading",
-                    background=OVERLAY, foreground=TEXT,
-                    font=("Yu Gothic UI", 10, "bold"), relief="flat")
-        s.map("Treeview", background=[("selected", "#585b70")])
-
-    def _lbl(self, parent, text, fg=TEXT, font=None, **kw):
-        return tk.Label(parent, text=text, bg=BG, fg=fg,
-                        font=font or ("Yu Gothic UI", 10), **kw)
-
-    def _info_block(self, parent, label: str, fg: str) -> tk.StringVar:
-        row = ttk.Frame(parent)
-        row.pack(fill="x", pady=(0, 6))
-        self._lbl(row, label, fg=BLUE, font=("Yu Gothic UI", 10, "bold")).pack(anchor="w")
-        var = tk.StringVar(value="—")
-        tk.Label(row, textvariable=var, bg=BG, fg=fg,
-                 font=("Yu Gothic UI", 10), wraplength=620, justify="left").pack(anchor="w")
-        return var
+    def _fonts(self):
+        self.f_brand = ctk.CTkFont("Yu Gothic UI", 20, "bold")
+        self.f_sub = ctk.CTkFont("Yu Gothic UI", 11)
+        self.f_h = ctk.CTkFont("Yu Gothic UI", 13, "bold")
+        self.f_row = ctk.CTkFont("Yu Gothic UI", 13)
+        self.f_size = ctk.CTkFont("Yu Gothic UI", 11)
+        self.f_chip = ctk.CTkFont("Yu Gothic UI", 11)
+        self.f_lbl = ctk.CTkFont("Yu Gothic UI", 11, "bold")
+        self.f_val = ctk.CTkFont("Yu Gothic UI", 13)
+        self.f_btn = ctk.CTkFont("Yu Gothic UI", 13, "bold")
+        self.f_mono = ctk.CTkFont("Consolas", 11)
+        self.f_mut = ctk.CTkFont("Yu Gothic UI", 11)
+        self.f_big = ctk.CTkFont("Yu Gothic UI", 16, "bold")
 
     def toggle_language(self):
-        """日本語 ⇄ 英語を切り替えてUIを作り直す"""
         global LANG
         LANG = "en" if LANG == "ja" else "ja"
         prev = self.selected_model
+        self.selected_model = None
         for w in self.root.winfo_children():
             w.destroy()
         self.root.title(t("app_title"))
         self._build()
-        self._update_tree()  # 取得済みデータで一覧を即再描画
-        # 選択中だったモデルを選び直す（→ 詳細欄も新しい言語で再表示される）
-        if prev and self.tree.exists(prev):
-            self.tree.selection_set(prev)
-            self.tree.see(prev)
+        self._render_list()
+        if prev and prev in self.row_widgets:
+            self._select(prev)
 
     def _build(self):
-        # ヘッダー
-        hdr = ttk.Frame(self.root, padding=(12, 8))
-        hdr.pack(fill="x")
-        self._lbl(hdr, t("brand"), fg=BLUE,
-                  font=("Yu Gothic UI", 14, "bold")).pack(side="left")
-        self.status_lbl = self._lbl(hdr, "", fg=GREEN)
-        self.status_lbl.pack(side="left", padx=16)
+        hdr = ctk.CTkFrame(self.root, fg_color="transparent")
+        hdr.pack(fill="x", padx=18, pady=(14, 6))
+        left = ctk.CTkFrame(hdr, fg_color="transparent")
+        left.pack(side="left")
+        ctk.CTkLabel(left, text=t("brand"), font=self.f_brand,
+                     text_color=PINK_TXT).pack(side="left")
+        self.status_lbl = ctk.CTkLabel(left, text="", font=self.f_sub, text_color=OK_GREEN)
+        self.status_lbl.pack(side="left", padx=14)
 
-        tk.Label(hdr, text=t("legend_dup"),
-                 bg=DUP_COLORS[0], fg=TEXT, font=("Yu Gothic UI", 9),
-                 padx=6, pady=2).pack(side="right", padx=(8, 0))
-        tk.Label(hdr, text=t("legend_owui"),
-                 bg=SURFACE, fg=TEXT, font=("Yu Gothic UI", 9),
-                 padx=6, pady=2).pack(side="right", padx=(8, 0))
-        ttk.Button(hdr, text=t("refresh"), command=self.refresh).pack(side="right")
-        ttk.Button(hdr, text=t("lang_button"),
-                   command=self.toggle_language).pack(side="right", padx=(0, 8))
+        right = ctk.CTkFrame(hdr, fg_color="transparent")
+        right.pack(side="right")
+        self.search_entry = ctk.CTkEntry(right, placeholder_text=t("search_ph"),
+                                         placeholder_text_color="#ab9fb8", font=self.f_row,
+                                         width=210, height=34, fg_color=CARD,
+                                         border_color=BORDER, text_color=TXT, corner_radius=18)
+        self.search_entry.pack(side="left", padx=(0, 8))
+        self.search_entry.bind("<KeyRelease>", lambda e: self._render_list())
+        ctk.CTkButton(right, text=t("lang_button"), command=self.toggle_language,
+                      font=self.f_row, fg_color="transparent", hover_color=GHOST_HOV,
+                      text_color=TXT_MUT, border_width=1, border_color=GHOST_BD,
+                      corner_radius=18, height=34, width=88).pack(side="left", padx=(0, 8))
+        ctk.CTkButton(right, text=t("refresh"), command=self.refresh, font=self.f_row,
+                      fg_color=LAV, hover_color=LAV_TXT, text_color="#ffffff",
+                      corner_radius=18, height=34, width=94).pack(side="left")
 
-        ttk.Separator(self.root).pack(fill="x")
+        main = ctk.CTkFrame(self.root, fg_color="transparent")
+        main.pack(fill="both", expand=True, padx=18, pady=(6, 14))
 
-        body = ttk.Frame(self.root, padding=12)
-        body.pack(fill="both", expand=True)
+        # 左: モデル一覧（ボタンは置かない＝視点を散らさない）
+        left_panel = ctk.CTkFrame(main, fg_color="transparent", width=430)
+        left_panel.pack(side="left", fill="y")
+        left_panel.pack_propagate(False)
+        lh = ctk.CTkFrame(left_panel, fg_color="transparent")
+        lh.pack(fill="x", pady=(0, 4))
+        ctk.CTkLabel(lh, text=t("list_title"), font=self.f_h,
+                     text_color=LAV_TXT).pack(side="left")
+        self.count_lbl = ctk.CTkLabel(lh, text="", font=self.f_mut, text_color=TXT_MUT)
+        self.count_lbl.pack(side="left", padx=8)
+        ctk.CTkLabel(left_panel, text=t("legend_hint"), font=self.f_mut,
+                     text_color=TXT_MUT, anchor="w").pack(fill="x", pady=(0, 4))
+        self.list_frame = ctk.CTkScrollableFrame(left_panel, fg_color=CARD, corner_radius=14,
+                                                 border_width=1, border_color=BORDER)
+        self.list_frame.pack(fill="both", expand=True)
 
-        # ── 左: モデルリスト ──────────────────────────────────────────────
-        left = ttk.Frame(body)
-        left.pack(side="left", fill="y", padx=(0, 12))
+        # 右: 詳細 ＋ 操作ボタン（選んだモデルの真下で完結＝視線移動を最小化）
+        right_panel = ctk.CTkFrame(main, fg_color="transparent")
+        right_panel.pack(side="left", fill="both", expand=True, padx=(14, 0))
+        ctk.CTkLabel(right_panel, text=t("detail_title"), font=self.f_h,
+                     text_color=LAV_TXT, anchor="w").pack(fill="x", pady=(0, 4))
 
-        self._lbl(left, t("list_title"), fg=MAUVE,
-                  font=("Yu Gothic UI", 11, "bold")).pack(anchor="w", pady=(0, 6))
+        act = ctk.CTkFrame(right_panel, fg_color="transparent")
+        act.pack(side="bottom", fill="x", pady=(10, 0))
+        ctk.CTkButton(act, text=t("btn_edit"), command=self.cmd_edit_prompt, font=self.f_btn,
+                      fg_color=PINK, hover_color=PINK_HOV, text_color="#ffffff",
+                      corner_radius=20, height=42, width=150).pack(side="left", padx=(0, 8))
+        ctk.CTkButton(act, text=t("btn_derive"), command=self.cmd_new_derived, font=self.f_btn,
+                      fg_color="transparent", hover_color=LAV_HOV, text_color=LAV_TXT,
+                      border_width=1, border_color=LAV, corner_radius=20, height=42,
+                      width=132).pack(side="left", padx=(0, 8))
+        ctk.CTkButton(act, text=t("btn_copy"), command=self.cmd_copy, font=self.f_row,
+                      fg_color="transparent", hover_color=GHOST_HOV, text_color=TXT_MUT,
+                      border_width=1, border_color=GHOST_BD, corner_radius=20, height=42,
+                      width=96).pack(side="left", padx=(0, 8))
+        ctk.CTkButton(act, text=t("btn_rename"), command=self.cmd_rename, font=self.f_row,
+                      fg_color="transparent", hover_color=GHOST_HOV, text_color=TXT_MUT,
+                      border_width=1, border_color=GHOST_BD, corner_radius=20, height=42,
+                      width=110).pack(side="left")
+        ctk.CTkButton(act, text=t("btn_delete"), command=self.cmd_delete, font=self.f_row,
+                      fg_color="transparent", hover_color=RED_HOV, text_color=RED,
+                      border_width=1, border_color=RED_BD, corner_radius=20, height=42,
+                      width=96).pack(side="right")
 
-        tv_frame = ttk.Frame(left)
-        tv_frame.pack(fill="both", expand=True)
+        self.detail_card = ctk.CTkFrame(right_panel, fg_color=CARD, corner_radius=16,
+                                        border_width=1, border_color=BORDER)
+        self.detail_card.pack(fill="both", expand=True)
+        self._build_detail()
 
-        self.tree = ttk.Treeview(tv_frame,
-                                  columns=("name", "size", "hash", "owui"),
-                                  show="headings", selectmode="browse")
-        self.tree.heading("name", text=t("col_name"))
-        self.tree.heading("size", text=t("col_size"))
-        self.tree.heading("hash", text=t("col_hash"))
-        self.tree.heading("owui", text=t("col_owui"))
-        self.tree.column("name", width=200, stretch=True)
-        self.tree.column("size", width=80,  stretch=False)
-        self.tree.column("hash", width=110, stretch=False)
-        self.tree.column("owui", width=55,  stretch=False, anchor="center")
+    def _build_detail(self):
+        self.detail_empty = ctk.CTkFrame(self.detail_card, fg_color="transparent")
+        ctk.CTkLabel(self.detail_empty, text="🦙",
+                     font=ctk.CTkFont("Yu Gothic UI", 40)).pack(pady=(0, 6))
+        ctk.CTkLabel(self.detail_empty, text=t("empty_detail"), font=self.f_val,
+                     text_color=TXT_HINT).pack()
 
-        vsb = ttk.Scrollbar(tv_frame, orient="vertical", command=self.tree.yview)
-        self.tree.configure(yscrollcommand=vsb.set)
-        self.tree.pack(side="left", fill="both", expand=True)
-        vsb.pack(side="right", fill="y")
-        self.tree.bind("<<TreeviewSelect>>", self._on_select)
+        self.detail_filled = ctk.CTkFrame(self.detail_card, fg_color="transparent")
+        pad = ctk.CTkFrame(self.detail_filled, fg_color="transparent")
+        pad.pack(fill="both", expand=True, padx=18, pady=16)
+        self.d_name = ctk.CTkLabel(pad, text="", font=self.f_big, text_color=PINK_TXT,
+                                   anchor="w", justify="left", wraplength=520)
+        self.d_name.pack(fill="x")
+        self.d_meta = ctk.CTkLabel(pad, text="", font=self.f_mut, text_color=TXT_MUT,
+                                   anchor="w")
+        self.d_meta.pack(fill="x", pady=(2, 10))
+        self.d_size = self._kv(pad, t("lbl_size"))
+        self.d_use = self._kv(pad, t("lbl_usecase"))
+        self.d_webui = self._kv(pad, t("lbl_owui_row"))
+        self.d_hash = self._kv(pad, t("lbl_hash"), mono=True)
+        ctk.CTkLabel(pad, text=t("lbl_embedded"), font=self.f_lbl, text_color=LAV_TXT,
+                     anchor="w").pack(fill="x", pady=(8, 4))
+        self.prompt_box = ctk.CTkTextbox(pad, font=self.f_mono, fg_color="#fbf8fc",
+                                         border_color=BORDER, border_width=1, text_color=TXT,
+                                         wrap="word", corner_radius=10)
+        self.prompt_box.pack(fill="both", expand=True)
+        self.prompt_box.configure(state="disabled")
+        self._show_empty()
 
-        # ボタン 1行目
-        btn1 = ttk.Frame(left)
-        btn1.pack(fill="x", pady=(10, 3))
-        ttk.Button(btn1, text=t("btn_delete"),  style="Danger.TButton",
-                   command=self.cmd_delete).pack(side="left", expand=True, fill="x", padx=(0, 3))
-        ttk.Button(btn1, text=t("btn_copy"),    style="Copy.TButton",
-                   command=self.cmd_copy).pack(side="left", expand=True, fill="x", padx=(0, 3))
-        ttk.Button(btn1, text=t("btn_rename"),  style="Warn.TButton",
-                   command=self.cmd_rename).pack(side="left", expand=True, fill="x")
+    def _kv(self, parent, label, mono=False):
+        row = ctk.CTkFrame(parent, fg_color="transparent")
+        row.pack(fill="x", pady=2)
+        ctk.CTkLabel(row, text=label, font=self.f_lbl, text_color=TXT_MUT, width=118,
+                     anchor="w").pack(side="left")
+        val = ctk.CTkLabel(row, text="—", font=(self.f_mono if mono else self.f_val),
+                           text_color=TXT, anchor="w", justify="left", wraplength=360)
+        val.pack(side="left", fill="x", expand=True)
+        return val
 
-        # ボタン 2行目
-        btn2 = ttk.Frame(left)
-        btn2.pack(fill="x", pady=(0, 0))
-        ttk.Button(btn2, text=t("btn_derive"),  style="New.TButton",
-                   command=self.cmd_new_derived).pack(side="left", expand=True, fill="x", padx=(0, 3))
-        ttk.Button(btn2, text=t("btn_edit"),    style="Edit.TButton",
-                   command=self.cmd_edit_prompt).pack(side="left", expand=True, fill="x")
+    def _show_empty(self):
+        self.detail_filled.pack_forget()
+        self.detail_empty.pack(expand=True)
+        try:
+            self.detail_card.configure(border_color=BORDER, border_width=1)
+        except Exception:
+            pass
 
-        # ── 右: 詳細 ─────────────────────────────────────────────────────
-        right = ttk.Frame(body)
-        right.pack(side="left", fill="both", expand=True)
+    def _show_filled(self):
+        self.detail_empty.pack_forget()
+        self.detail_filled.pack(fill="both", expand=True)
+        try:
+            self.detail_card.configure(border_color=PINK, border_width=2)
+        except Exception:
+            pass
 
-        self._lbl(right, t("detail_title"), fg=MAUVE,
-                  font=("Yu Gothic UI", 11, "bold")).pack(anchor="w", pady=(0, 6))
+    def _flash_detail(self):
+        try:
+            self.detail_card.configure(fg_color=PINK_FLASH)
+            self.root.after(200, lambda: self.detail_card.configure(fg_color=CARD))
+        except Exception:
+            pass
 
-        detail = ttk.Frame(right)
-        detail.pack(fill="both", expand=True)
+    def set_status(self, msg, color=None):
+        self.status_lbl.configure(text=msg, text_color=color or OK_GREEN)
 
-        self.v_name    = self._info_block(detail, t("lbl_name"),    TEXT)
-        self.v_size    = self._info_block(detail, t("lbl_size"),    TEXT)
-        self.v_hash    = self._info_block(detail, t("lbl_hash"),    PEACH)
-        self.v_usecase = self._info_block(detail, t("lbl_usecase"), GREEN)
-        self.v_info    = self._info_block(detail, t("lbl_info"),    TEXT)
+    def _model_names(self):
+        return [m["name"] for m in self.models]
 
-        self._lbl(detail, t("lbl_embedded"),
-                  fg=BLUE, font=("Yu Gothic UI", 10, "bold")).pack(anchor="w")
-
-        txt_frame = ttk.Frame(detail)
-        txt_frame.pack(fill="both", expand=True, pady=(4, 0))
-
-        self.prompt_txt = tk.Text(
-            txt_frame, wrap="word", bg=SURFACE, fg=TEXT,
-            font=("Consolas", 9), relief="flat", padx=8, pady=8,
-            state="disabled", selectbackground=OVERLAY, insertbackground=TEXT
-        )
-        txt_vsb = ttk.Scrollbar(txt_frame, orient="vertical", command=self.prompt_txt.yview)
-        self.prompt_txt.configure(yscrollcommand=txt_vsb.set)
-        self.prompt_txt.pack(side="left", fill="both", expand=True)
-        txt_vsb.pack(side="right", fill="y")
-
-    # ── ステータス ────────────────────────────────────────────────────────
-    def set_status(self, msg: str, color: str = GREEN):
-        self.status_lbl.configure(text=msg, fg=color)
-
-    # ── 一覧更新 ─────────────────────────────────────────────────────────
     def refresh(self):
-        self.set_status(t("status_loading"), YELLOW)
+        self.set_status(t("status_loading"), WARN_AMBER)
 
         def fetch():
             try:
@@ -777,96 +863,112 @@ class App:
             except Exception as e:
                 self.root.after(0, lambda: self.set_status(t("status_conn_error", e=e), RED))
                 return
-
-            # OpenWebUI側の設定状況も取得（繋がらなくても一覧表示自体は継続する）
             try:
-                owui_models = openwebui_get_base_models()
-                self.owui_prompt_set = {
-                    m.get("id") for m in owui_models
-                    if (m.get("params") or {}).get("system")
-                }
+                owui = openwebui_get_base_models()
+                self.owui_prompt_set = {m.get("id") for m in owui
+                                        if (m.get("params") or {}).get("system")}
             except Exception:
                 self.owui_prompt_set = set()
-
-            self.root.after(0, self._update_tree)
+            self.root.after(0, self._render_list)
 
         threading.Thread(target=fetch, daemon=True).start()
 
-    def _update_tree(self):
-        self.tree.delete(*self.tree.get_children())
+    def _render_list(self):
+        if not hasattr(self, "list_frame"):
+            return
+        for w in self.list_frame.winfo_children():
+            w.destroy()
+        self.row_widgets = {}
+        flt = self.search_entry.get().strip().lower() if hasattr(self, "search_entry") else ""
 
         from collections import Counter
-        digest_count = Counter(short_hash(m.get("digest", "")) for m in self.models)
-
-        dup_color_map: dict = {}
+        dc = Counter(short_hash(m.get("digest", "")) for m in self.models)
+        dup_map = {}
         ci = 0
-        for h, count in digest_count.items():
-            if count > 1:
-                dup_color_map[h] = DUP_COLORS[ci % len(DUP_COLORS)]
+        for h, c in dc.items():
+            if c > 1:
+                dup_map[h] = DUP_TINTS[ci % len(DUP_TINTS)]
                 ci += 1
-
-        for i, color in enumerate(DUP_COLORS):
-            self.tree.tag_configure(f"dup{i}", background=color, foreground=TEXT)
 
         for m in self.models:
             name = m.get("name", "")
-            size = fmt_size(m.get("size", 0))
-            h    = short_hash(m.get("digest", ""))
-            owui = "🌐" if name in self.owui_prompt_set else "—"
-            tags = ()
-            if h in dup_color_map:
-                ci = DUP_COLORS.index(dup_color_map[h])
-                tags = (f"dup{ci}",)
-            self.tree.insert("", "end", iid=name, values=(name, size, h, owui), tags=tags)
+            if flt and flt not in name.lower():
+                continue
+            base = dup_map.get(short_hash(m.get("digest", "")), "transparent")
+            row = ctk.CTkFrame(self.list_frame, fg_color=base, corner_radius=10)
+            row.pack(fill="x", padx=4, pady=3)
+            inner = ctk.CTkFrame(row, fg_color="transparent")
+            inner.pack(fill="x", padx=10, pady=7)
+            nl = ctk.CTkLabel(inner, text=name, font=self.f_row, text_color=TXT,
+                              anchor="w", justify="left", wraplength=250)
+            nl.pack(side="left", fill="x", expand=True)
+            rt = ctk.CTkFrame(inner, fg_color="transparent")
+            rt.pack(side="right")
+            if name in self.owui_prompt_set:
+                ctk.CTkLabel(rt, text=" 🌐 WebUI ", font=self.f_chip, fg_color=CHIP_BG,
+                             text_color=CHIP_TX, corner_radius=8).pack(side="left", padx=(0, 8))
+            ctk.CTkLabel(rt, text=fmt_size(m.get("size", 0)), font=self.f_size,
+                         text_color=TXT_MUT).pack(side="left")
+            self.row_widgets[name] = {"row": row, "name_label": nl, "base": base}
+            self._bind_click(row, name)
 
-        dup_groups = sum(1 for c in digest_count.values() if c > 1)
-        msg = t("status_count", n=len(self.models))
+        dup_groups = sum(1 for c in dc.values() if c > 1)
+        cnt = t("status_count", n=len(self.models))
         if dup_groups:
-            msg += t("status_dup", n=dup_groups)
-        self.set_status(msg)
+            cnt += t("status_dup", n=dup_groups)
+        self.count_lbl.configure(text=cnt)
+        self.set_status(t("ready"), OK_GREEN)
+        if self.selected_model in self.row_widgets:
+            self._highlight(self.selected_model)
 
-    def _model_names(self) -> list:
-        return [m["name"] for m in self.models]
+    def _bind_click(self, widget, name):
+        widget.bind("<Button-1>", lambda e, n=name: self._select(n))
+        for ch in widget.winfo_children():
+            self._bind_click(ch, name)
 
-    # ── 選択 ─────────────────────────────────────────────────────────────
-    def _on_select(self, _event=None):
-        sel = self.tree.selection()
-        if not sel:
+    def _highlight(self, name):
+        for n, info in self.row_widgets.items():
+            if n == name:
+                info["row"].configure(fg_color=PINK_SOFT)
+                info["name_label"].configure(text_color=PINK_TXT)
+            else:
+                info["row"].configure(fg_color=info["base"])
+                info["name_label"].configure(text_color=TXT)
+
+    def _select(self, name):
+        if name not in self.row_widgets:
             return
-        self.selected_model = sel[0]
-        m = next((x for x in self.models if x["name"] == self.selected_model), {})
-
-        self.v_name.set(self.selected_model)
-        self.v_size.set(fmt_size(m.get("size", 0)))
-        self.v_hash.set(m.get("digest", "—"))
-        self.v_usecase.set(get_use_case(self.selected_model))
-        self.v_info.set(t("loading"))
+        self.selected_model = name
+        self._highlight(name)
+        self._show_filled()
+        self._flash_detail()
+        m = next((x for x in self.models if x["name"] == name), {})
+        synced = name in self.owui_prompt_set
+        self.d_name.configure(text=name)
+        self.d_meta.configure(text=t("loading"))
+        self.d_size.configure(text=fmt_size(m.get("size", 0)))
+        self.d_use.configure(text=get_use_case(name))
+        self.d_webui.configure(text=(t("owui_yes") if synced else t("owui_no")),
+                               text_color=(CHIP_TX if synced else TXT_MUT))
+        self.d_hash.configure(text=m.get("digest", "—"))
         self._set_prompt(t("fetching"))
-
-        name = self.selected_model
 
         def fetch():
             try:
                 data = ollama_post("/api/show", {"model": name})
                 self.root.after(0, lambda: self._show_details(data))
             except Exception as e:
-                self.root.after(0, lambda: self.v_info.set(t("fetch_failed", e=e)))
+                self.root.after(0, lambda: self.d_meta.configure(text=t("fetch_failed", e=e)))
 
         threading.Thread(target=fetch, daemon=True).start()
 
-    def _show_details(self, data: dict):
+    def _show_details(self, data):
         details = data.get("details", {})
         parts = []
-        if details.get("family"):
-            parts.append(t("info_family", v=details['family']))
-        if details.get("parameter_size"):
-            parts.append(t("info_params", v=details['parameter_size']))
-        if details.get("quantization_level"):
-            parts.append(t("info_quant", v=details['quantization_level']))
-        if details.get("format"):
-            parts.append(t("info_format", v=details['format']))
-        self.v_info.set("  |  ".join(parts) if parts else t("no_info"))
-
+        for k in ("family", "parameter_size", "quantization_level", "format"):
+            if details.get(k):
+                parts.append(str(details[k]))
+        self.d_meta.configure(text=("  ·  ".join(parts) if parts else t("no_info")))
         system = data.get("system", "")
         if system:
             content = t("sys_header", v=system)
@@ -875,96 +977,80 @@ class App:
             content = modelfile if modelfile else t("no_system")
         self._set_prompt(content)
 
-    def _set_prompt(self, text: str):
-        self.prompt_txt.configure(state="normal")
-        self.prompt_txt.delete("1.0", "end")
-        self.prompt_txt.insert("1.0", text)
-        self.prompt_txt.configure(state="disabled")
+    def _set_prompt(self, text):
+        self.prompt_box.configure(state="normal")
+        self.prompt_box.delete("1.0", "end")
+        self.prompt_box.insert("1.0", text)
+        self.prompt_box.configure(state="disabled")
 
     def _clear_details(self):
         self.selected_model = None
-        for v in (self.v_name, self.v_size, self.v_hash, self.v_usecase, self.v_info):
-            v.set("—")
-        self._set_prompt("")
+        self._show_empty()
+        self._highlight("__none__")
 
-    # ── 保存先タグ（新規作成時、名前に強制付与） ──────────────────────────
-    def _apply_dest_tag(self, name: str, to_ollama: bool, to_openwebui: bool) -> str:
-        """どの保存先向けに作ったかを後から一目で区別できるよう、名前に強制でタグを付ける"""
+    def _apply_dest_tag(self, name, to_ollama, to_openwebui):
         if to_ollama and to_openwebui:
             tag = "-OWU-OLM"
         elif to_openwebui:
             tag = "-OWU"
         else:
             tag = "-OLM"
-
         if ":" in name:
             repo, _, ver = name.partition(":")
             return f"{repo}{tag}:{ver}"
         return f"{name}{tag}"
 
-    # ── モデル作成・プロンプト保存（共通処理：Ollama / OpenWebUI 両対応） ──
-    def _save_to_destinations(self, base: str, name: str, prompt: str,
-                              to_ollama: bool, to_openwebui: bool):
-        """チェックされた保存先へ順番に書き込む（Ollama → OpenWebUI の順）"""
-        self.set_status(t("saving", name=name), YELLOW)
+    def _save_to_destinations(self, base, name, prompt, to_ollama, to_openwebui):
+        self.set_status(t("saving", name=name), WARN_AMBER)
 
         def run():
-            results = []  # (保存先名, 成功?, エラー)
-
+            results = []
             if to_ollama:
                 try:
                     def on_progress(status):
                         shown = status[:50] + "..." if len(status) > 50 else status
                         self.root.after(0, lambda: self.set_status(
-                            t("saving_ollama", s=shown), YELLOW))
-
+                            t("saving_ollama", s=shown), WARN_AMBER))
                     ollama_create(name, base, prompt, on_progress)
                     results.append(("Ollama", True, None))
                 except Exception as e:
                     results.append(("Ollama", False, e))
-
             if to_openwebui:
-                self.root.after(0, lambda: self.set_status(t("saving_owui"), YELLOW))
+                self.root.after(0, lambda: self.set_status(t("saving_owui"), WARN_AMBER))
                 try:
                     openwebui_update_system_prompt(name, prompt)
                     results.append(("OpenWebUI", True, None))
                 except Exception as e:
                     results.append(("OpenWebUI", False, e))
-
             self.root.after(0, lambda: self._finish_save(name, results))
 
         threading.Thread(target=run, daemon=True).start()
 
-    def _finish_save(self, name: str, results: list):
-        oks  = [dest for dest, ok, _ in results if ok]
+    def _finish_save(self, name, results):
+        oks = [dest for dest, ok, _ in results if ok]
         errs = [(dest, err) for dest, ok, err in results if not ok]
-
         if errs:
             detail = "\n\n".join(f"【{dest}】\n{err}" for dest, err in errs)
             ok_msg = t("save_ok_line", oks=" / ".join(oks)) if oks else ""
-            messagebox.showwarning(
-                t("save_partial_title", name=name),
-                t("save_fail_body", ok=ok_msg, detail=detail),
-                parent=self.root)
+            messagebox.showwarning(t("save_partial_title", name=name),
+                                   t("save_fail_body", ok=ok_msg, detail=detail),
+                                   parent=self.root)
             self.set_status(t("save_partial", name=name,
                               oks=" / ".join(oks) if oks else t("none")),
-                            YELLOW if oks else RED)
+                            WARN_AMBER if oks else RED)
         else:
-            self.set_status(t("save_done", name=name, oks=" / ".join(oks)), GREEN)
-
+            self.set_status(t("save_done", name=name, oks=" / ".join(oks)), OK_GREEN)
         self.refresh()
 
-    # ── 削除 ─────────────────────────────────────────────────────────────
     def cmd_delete(self):
         if not self.selected_model:
             messagebox.showwarning(t("unselected"), t("del_unselected"), parent=self.root)
             return
         name = self.selected_model
-        if not messagebox.askyesno(t("del_confirm_title"),
-                                   t("del_confirm", name=name),
+        if not messagebox.askyesno(t("del_confirm_title"), t("del_confirm", name=name),
                                    icon="warning", parent=self.root):
             return
-        self.set_status(t("deleting"), YELLOW)
+        self.set_status(t("deleting"), WARN_AMBER)
 
         def run():
             try:
@@ -973,72 +1059,60 @@ class App:
                 self.root.after(0, self._clear_details)
                 self.root.after(0, self.refresh)
             except Exception as e:
-                self.root.after(0, lambda: messagebox.showerror(t("del_error_title"), str(e), parent=self.root))
+                self.root.after(0, lambda: messagebox.showerror(t("del_error_title"), str(e),
+                                                                parent=self.root))
                 self.root.after(0, lambda: self.set_status(t("del_failed"), RED))
 
         threading.Thread(target=run, daemon=True).start()
 
-    # ── コピー（プロンプトなしで別名追加） ───────────────────────────────
     def cmd_copy(self):
         if not self.selected_model:
             messagebox.showwarning(t("unselected"), t("copy_unselected"), parent=self.root)
             return
         original = self.selected_model
-        new_name = simpledialog.askstring(
-            t("copy_title"),
-            t("copy_prompt", name=original),
-            parent=self.root
-        )
+        new_name = ask_name(self.root, t("copy_title"), t("copy_prompt", name=original),
+                            default=copy_suggest(original))
         if not new_name or not new_name.strip():
             return
         new_name = new_name.strip()
         if new_name == original:
             messagebox.showinfo(t("nochange_title"), t("nochange"), parent=self.root)
             return
-
-        self.set_status(t("copying"), YELLOW)
+        self.set_status(t("copying"), WARN_AMBER)
 
         def run():
             try:
                 ollama_post("/api/copy", {"source": original, "destination": new_name})
                 self.root.after(0, lambda: self.set_status(
-                    t("copy_done", a=original, b=new_name), GREEN))
+                    t("copy_done", a=original, b=new_name), OK_GREEN))
                 self.root.after(0, self.refresh)
             except Exception as e:
-                self.root.after(0, lambda: messagebox.showerror(t("copy_error_title"), str(e), parent=self.root))
+                self.root.after(0, lambda: messagebox.showerror(t("copy_error_title"), str(e),
+                                                                parent=self.root))
                 self.root.after(0, lambda: self.set_status(t("copy_failed"), RED))
 
         threading.Thread(target=run, daemon=True).start()
 
-    # ── リネーム ─────────────────────────────────────────────────────────
     def cmd_rename(self):
         if not self.selected_model:
             messagebox.showwarning(t("unselected"), t("rename_unselected"), parent=self.root)
             return
-
-        original    = self.selected_model
+        original = self.selected_model
         backup_name = original.replace(":", "_") + "_backup"
-
-        new_name = simpledialog.askstring(
-            t("rename_title"),
-            t("rename_prompt", name=original),
-            parent=self.root
-        )
+        new_name = ask_name(self.root, t("rename_title"), t("rename_prompt", name=original),
+                            default=original)
         if not new_name or not new_name.strip():
             return
         new_name = new_name.strip()
         if new_name == original:
             messagebox.showinfo(t("nochange_title"), t("nochange"), parent=self.root)
             return
-
-        if not messagebox.askyesno(
-            t("rename_confirm_title"),
-            t("rename_confirm", o=original, b=backup_name, n=new_name),
-            parent=self.root
-        ):
+        if not messagebox.askyesno(t("rename_confirm_title"),
+                                   t("rename_confirm", o=original, b=backup_name, n=new_name),
+                                   parent=self.root):
             return
 
-        def upd(msg, color=YELLOW):
+        def upd(msg, color=WARN_AMBER):
             self.root.after(0, lambda: self.set_status(msg, color))
 
         def run():
@@ -1054,7 +1128,7 @@ class App:
                 if not check:
                     raise RuntimeError(t("rn_check_fail"))
                 ollama_delete("/api/delete", {"model": backup_name})
-                upd(t("rn_done", o=original, n=new_name), GREEN)
+                upd(t("rn_done", o=original, n=new_name), OK_GREEN)
                 self.root.after(0, self._clear_details)
                 self.root.after(0, self.refresh)
             except Exception as e:
@@ -1066,7 +1140,6 @@ class App:
 
         threading.Thread(target=run, daemon=True).start()
 
-    # ── 派生登録（ベースモデル + 新プロンプト → 新モデル） ───────────────
     def cmd_new_derived(self):
         default_base = self.selected_model or ""
 
@@ -1074,66 +1147,47 @@ class App:
             final_name = self._apply_dest_tag(name, to_ollama, to_openwebui)
             self._save_to_destinations(base, final_name, prompt, to_ollama, to_openwebui)
 
-        dlg = ModelfileEditor(
-            self.root,
-            title=t("title_derive"),
-            model_names=self._model_names(),
-            default_base=default_base,
-            default_name="",
-            default_prompt="",
-            on_save=on_save,
-            lock_to_ollama=True
-        )
-        self.root.wait_window(dlg)
+        ModelfileEditor(self.root, title=t("title_derive"), model_names=self._model_names(),
+                        default_base=default_base,
+                        default_name=(copy_suggest(default_base) if default_base else ""),
+                        default_prompt="", on_save=on_save, lock_to_ollama=True)
 
-    # ── プロンプト編集（選択中モデルのプロンプトを書き換えて上書き） ──────
     def cmd_edit_prompt(self):
         if not self.selected_model:
             messagebox.showwarning(t("unselected"), t("edit_unselected"), parent=self.root)
             return
-
         name = self.selected_model
-        self.set_status(t("loading"), YELLOW)
+        self.set_status(t("loading"), WARN_AMBER)
 
         def fetch():
             try:
                 data = ollama_post("/api/show", {"model": name})
-                system    = data.get("system", "")
+                system = data.get("system", "")
                 modelfile = data.get("modelfile", "")
-
-                # modelfile の FROM 行を抽出（blob パスを使うことで循環参照を回避）
-                from_line = name  # フォールバック
+                from_line = name
                 for line in modelfile.splitlines():
                     stripped = line.strip()
                     if stripped.upper().startswith("FROM ") and not stripped.startswith("#"):
                         from_line = stripped[5:].strip()
                         break
-
                 self.root.after(0, lambda: self._open_edit_dialog(name, from_line, system))
             except Exception as e:
-                self.root.after(0, lambda: messagebox.showerror(
-                    t("fetch_error_title"), str(e), parent=self.root))
+                self.root.after(0, lambda: messagebox.showerror(t("fetch_error_title"), str(e),
+                                                                parent=self.root))
                 self.root.after(0, lambda: self.set_status(t("fetch_failed_status"), RED))
 
         threading.Thread(target=fetch, daemon=True).start()
 
-    def _open_edit_dialog(self, current_name: str, from_line: str, current_prompt: str):
+    def _open_edit_dialog(self, current_name, from_line, current_prompt):
         self.set_status("")
 
         def on_save(base_model, new_name, new_prompt, to_ollama, to_openwebui):
             self._save_to_destinations(base_model, new_name, new_prompt, to_ollama, to_openwebui)
 
-        # ベースはモデル名を使う（blobパスより安定）
-        ModelfileEditor(
-            self.root,
-            title=t("title_edit", name=current_name),
-            model_names=self._model_names(),
-            default_base=current_name,
-            default_name=current_name,
-            default_prompt=current_prompt,
-            on_save=on_save,
-            base_readonly=True
-        )
+        ModelfileEditor(self.root, title=t("title_edit", name=current_name),
+                        model_names=self._model_names(), default_base=current_name,
+                        default_name=current_name, default_prompt=current_prompt,
+                        on_save=on_save, base_readonly=True)
 
 
 if __name__ == "__main__":
@@ -1142,7 +1196,6 @@ if __name__ == "__main__":
         windll.shcore.SetProcessDpiAwareness(1)
     except Exception:
         pass
-
-    root = tk.Tk()
+    root = ctk.CTk()
     App(root)
     root.mainloop()

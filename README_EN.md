@@ -1,4 +1,4 @@
-# Modekore 🦙
+# ModeColle 🦙
 
 ## "I set the system prompt… so why isn't it working?" 🤔
 
@@ -6,7 +6,7 @@ If you've ever edited a model's system prompt in Ollama, opened Open WebUI, and 
 
 Open WebUI (v0.4+) doesn't read the system prompt baked into an Ollama model. It keeps its **own** copy, in its **own** database. So your carefully written prompt just sits in Ollama, doing nothing.
 
-I lost an evening to this. Even asking AI chatbots didn't surface the real reason. So I built **Modekore** 🦙 — a small, free Windows tool that writes your system prompt to **both Ollama and Open WebUI in one click**, so what you set is what you get.
+I lost an evening to this. Even asking AI chatbots didn't surface the real reason. So I built **ModeColle** 🦙 — a small, free Windows tool that writes your system prompt to **both Ollama and Open WebUI in one click**, so what you set is what you get.
 
 ---
 
@@ -74,7 +74,7 @@ you can delete, copy, rename models and edit their prompts — just pick one fro
    Download from [ollama.com](https://ollama.com/), install it, and leave it running.
 
 3. **Put this tool's folder wherever you like**
-   You just need `modekore.py` and `run.bat` in the same folder.
+   You just need `ModeColle.py` and `run.bat` in the same folder.
 
 4. **(Optional) Prepare a config file to use OpenWebUI sync**
    → See [About OpenWebUI integration](#about-openwebui-integration-important) for details.
@@ -83,7 +83,7 @@ you can delete, copy, rename models and edit their prompts — just pick one fro
 
 ## How to launch
 
-Just double-click **`run.bat`** in the same folder. It starts `modekore.py`.
+Just double-click **`run.bat`** in the same folder. It starts `ModeColle.py`.
 
 If it fails to start, the window stays open showing the error (`pause`), so you can read what went wrong.
 
@@ -99,7 +99,7 @@ The window has three parts: a **header on top**, a **model list on the left**, a
 
 ### Top: Header
 
-- **🦙 Modekore** … the title
+- **🦙 ModeColle** … the title
 - **Status** … shows what it's doing right now (loading / success / error) in color
 - **🌐 EN / 日本語** … toggles the UI language between Japanese and English (switches each time you press it)
 - **🔄 Refresh** … reloads the list to the latest state
@@ -171,12 +171,12 @@ The name does not change. You can choose Ollama / OpenWebUI as the save target.
 
 **OpenWebUI (v0.4 and later) ignores the system prompt embedded in an Ollama model.**
 
-In other words, even if you correctly save a prompt to Ollama with Modekore (or with commands),
+In other words, even if you correctly save a prompt to Ollama with ModeColle (or with commands),
 **it does not show up at all in OpenWebUI's chat.**
 To make a prompt take effect in OpenWebUI, you have to write it into OpenWebUI's own setting
 (the system prompt field in the admin panel).
 
-To resolve this mismatch, Modekore lets you **write to both Ollama and OpenWebUI from the same screen.**
+To resolve this mismatch, ModeColle lets you **write to both Ollama and OpenWebUI from the same screen.**
 
 ### Save-target checkboxes
 
@@ -197,14 +197,14 @@ OpenWebUI treats any model you've never touched in its admin panel as an "unknow
 Because of this, you previously had to **manually save the model once in the OpenWebUI admin panel**
 before sending it a prompt for the first time (a so-called "first-time registration").
 
-**Modekore automates this step.**
-If the model you're saving doesn't exist on the OpenWebUI side yet, Modekore registers it automatically
+**ModeColle automates this step.**
+If the model you're saving doesn't exist on the OpenWebUI side yet, ModeColle registers it automatically
 and then writes the prompt. You don't need to open the admin panel to prepare anything.
 Just check the box and save — done.
 
 > 💡 **Saved it, but it doesn't show up in OpenWebUI? → Refresh the page with F5 ♡**
-> OpenWebUI's web page does **not automatically re-display** content written by an external tool like Modekore.
-> The moment Modekore saves it and 🌐 appears, the data is already inside OpenWebUI.
+> OpenWebUI's web page does **not automatically re-display** content written by an external tool like ModeColle.
+> The moment ModeColle saves it and 🌐 appears, the data is already inside OpenWebUI.
 > To check the contents in the admin panel, **reload the page (F5, or reopen the model)**
 > and the latest content will be there.
 
@@ -256,7 +256,7 @@ Settings → Account → API Keys.
 
 You can accidentally register the same AI model twice under different names (a waste of disk space).
 
-Modekore gives rows with the **same hash (content identifier) the same background color** to point this out.
+ModeColle gives rows with the **same hash (content identifier) the same background color** to point this out.
 Rows sharing a color have "identical contents = duplicates." Delete the one you don't need to tidy up.
 
 The status bar at the bottom also shows a count like "Duplicate groups: N."
@@ -279,11 +279,11 @@ A. Check that Ollama is running (`http://localhost:11434`).
 A. Check the following:
 - Is `openwebui_config.json` created correctly?
 - Is the API key valid? (For 403, check "Endpoint Restrictions" above)
-- Does the model exist in Ollama? (Modekore handles registering it on the OpenWebUI side automatically)
+- Does the model exist in Ollama? (ModeColle handles registering it on the OpenWebUI side automatically)
 
-**Q. I saved with Modekore and 🌐 appeared, but the OpenWebUI screen looks empty**
+**Q. I saved with ModeColle and 🌐 appeared, but the OpenWebUI screen looks empty**
 A. **Reload the OpenWebUI page with F5 ♡**
-OpenWebUI's web page does not automatically reflect changes written from outside by Modekore (a stale view remains).
+OpenWebUI's web page does not automatically reflect changes written from outside by ModeColle (a stale view remains).
 If 🌐 is showing, the data is already saved in OpenWebUI. Reopen the page and it will display properly.
 **You do not need to manually save (handshake) from the admin panel yourself.**
 
@@ -309,4 +309,4 @@ Whoever receives it should copy the example to make their own `openwebui_config.
 
 ---
 
-🦙 *Modekore — making Ollama × OpenWebUI prompt management simpler.*
+🦙 *ModeColle — making Ollama × OpenWebUI prompt management simpler.*
