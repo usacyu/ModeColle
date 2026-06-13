@@ -30,3 +30,5 @@ run_log.txt
 .idea/
 Thumbs.db
 desktop.ini
+# ◆始まり = 公開しない（自分用メモ・実験Ver）。物理的にpush不可にする
+◆*
