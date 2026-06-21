@@ -1,0 +1,4 @@
+# ModeColle dependencies
+# tkinter is bundled with Python (no install needed).
+# Install with:  pip install -r requirements.txt
+customtkinter>=5.2.0

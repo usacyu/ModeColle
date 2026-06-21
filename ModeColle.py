@@ -22,6 +22,9 @@ TR = {
         "app_title": "もでコレ 🦙",
         "brand": "🦙 もでコレ",
         "lang_button": "🌐 EN",
+        "help_button": "❓ ヘルプ",
+        "help_title": "❓ もでコレの使い方",
+        "help_close": "閉じる",
         "refresh": "🔄 更新",
         "legend_dup": "■ 同じハッシュ = 同じ実体（重複）",
         "legend_owui": "🌐 = OpenWebUI側にもプロンプト設定済み",
@@ -135,6 +138,9 @@ TR = {
         "app_title": "ModeColle 🦙",
         "brand": "🦙 ModeColle",
         "lang_button": "🌐 日本語",
+        "help_button": "❓ Help",
+        "help_title": "❓ How to use ModeColle",
+        "help_close": "Close",
         "refresh": "🔄 Refresh",
         "legend_dup": "■ Same hash = same data (duplicate)",
         "legend_owui": "🌐 = Prompt also set on OpenWebUI",
@@ -250,6 +256,72 @@ TR = {
 def t(key, **kw):
     s = TR.get(LANG, TR["ja"]).get(key) or TR["ja"].get(key, key)
     return s.format(**kw) if kw else s
+
+
+# アプリ内ヘルプの本文（見出し, 本文）のリスト。LANG連動でHelpDialogが表示する。
+HELP_SECTIONS = {
+    "ja": [
+        ("もでコレって何？",
+         "Ollama に入れた AI モデルを、コマンドを覚えなくても一覧から選んでボタン操作で管理できる "
+         "Windows ツールです。さらに OpenWebUI 側のシステムプロンプトも、同じ画面から直接読み書きできます。"),
+        ("使い方は3ステップ",
+         "① 左の「登録モデル一覧」から、操作したいモデルをクリックして選ぶ\n"
+         "② 右の「モデル詳細」に、容量・おすすめ用途・組み込みプロンプトなどが表示される\n"
+         "③ 右下のボタンで、編集・コピー・リネーム・削除などを実行する"),
+        ("ボタンの意味",
+         "🖊️ プロンプト編集 … 選んだモデルのシステムプロンプトを書き換える\n"
+         "🆕 派生登録 … 既存モデルをベースに、別プロンプトの新しいモデルを作る\n"
+         "📋 コピー … 同じ中身を別名でもう1つ作る（容量は増えない）\n"
+         "✏️ リネーム … 安全な手順（バックアップ→確認→入れ替え）で名前を変える\n"
+         "🗑️ 削除 … いらないモデルを確認つきで消す\n"
+         "🔄 更新 … 一覧を最新に読み直す　／　🌐 … 日本語⇄英語の切替"),
+        ("OpenWebUI連携（ここが肝心）",
+         "編集・派生のダイアログで「☑ OpenWebUIにも反映する」を入れると、Ollama と OpenWebUI の "
+         "両方へ一度に書き込みます。\n"
+         "⚠️ OpenWebUI は Ollama に埋め込んだプロンプトを読みません（自分専用の別の場所に持つため）。"
+         "だからこのツールで両方に書くのが大事。これがもでコレを作った理由です。\n"
+         "💡 保存しても OpenWebUI の画面は自動で更新されません。F5 で再読み込みしてね。\n"
+         "🌐 バッジ … そのモデルが OpenWebUI 側にもプロンプト設定済みの印。"),
+        ("色分け（重複の発見）",
+         "一覧で同じ色がついたモデル同士は、中身（ハッシュ）が同じ＝別名で二重登録されているという印です。"
+         "容量を節約したいときの、整理の目印になります。"),
+        ("困ったとき",
+         "・モデルが出てこない → Ollama が起動しているか確認（http://localhost:11434）\n"
+         "・OpenWebUI に繋がらない → 本体と同じフォルダの openwebui_config.json の URL と API キーを確認\n"
+         "・起動しない → 「pip install customtkinter」を実行したか確認"),
+    ],
+    "en": [
+        ("What is ModeColle?",
+         "A Windows tool that lets you manage the AI models in Ollama from a list with button "
+         "clicks - no commands to memorize. It can also read and write the system prompts on the "
+         "OpenWebUI side from the same screen."),
+        ("Three simple steps",
+         "1. Click a model in the \"Installed models\" list on the left to select it\n"
+         "2. Its size, suggested use, embedded prompt and more appear under \"Model details\" on the right\n"
+         "3. Use the buttons at the bottom right to edit, copy, rename or delete it"),
+        ("What the buttons do",
+         "🖊️ Edit prompt … rewrite the selected model's system prompt\n"
+         "🆕 New / Derive … make a new model from an existing one with a different prompt\n"
+         "📋 Copy … make another copy under a new name (no extra disk use)\n"
+         "✏️ Rename … rename safely (back up -> verify -> swap)\n"
+         "🗑️ Delete … remove a model you don't need, with confirmation\n"
+         "🔄 Refresh … reload the list  /  🌐 … switch Japanese <-> English"),
+        ("OpenWebUI integration (the key part)",
+         "In the edit / derive dialog, tick \"☑ Also apply to OpenWebUI\" to write to both Ollama "
+         "and OpenWebUI at once.\n"
+         "⚠️ OpenWebUI does NOT read the prompt embedded in an Ollama model (it keeps its own copy "
+         "elsewhere). That's why writing to both with this tool matters - it's the reason ModeColle exists.\n"
+         "💡 After saving, the OpenWebUI page won't refresh on its own. Press F5 to reload it.\n"
+         "🌐 badge … marks a model that also has its prompt set on OpenWebUI."),
+        ("Color coding (spotting duplicates)",
+         "Models that share the same color in the list have the same content (same hash) = registered "
+         "twice under different names. A handy marker when you want to clean up and save space."),
+        ("Troubleshooting",
+         "- No models show up -> check that Ollama is running (http://localhost:11434)\n"
+         "- Can't reach OpenWebUI -> check the URL and API key in openwebui_config.json (same folder as the app)\n"
+         "- App won't start -> make sure you ran \"pip install customtkinter\""),
+    ],
+}
 
 
 # モデル名キーワード → 用途（言語別）/ model-name keyword -> use case (per language)
@@ -653,6 +725,62 @@ class AskNameDialog(ctk.CTkToplevel):
         self.destroy()
 
 
+class HelpDialog(ctk.CTkToplevel):
+    """使い方をアプリ内で表示するヘルプ窓。日英はLANG連動（開いた時点の言語で表示）。"""
+
+    def __init__(self, parent):
+        super().__init__(parent)
+        self.title(t("help_title"))
+        self.configure(fg_color=WIN_BG)
+        W, H = 640, 680
+        self.geometry(f"{W}x{H}")
+        self.minsize(520, 460)
+        self.update_idletasks()
+        try:
+            px, py = parent.winfo_rootx(), parent.winfo_rooty()
+            pw, ph = parent.winfo_width(), parent.winfo_height()
+            self.geometry(f"{W}x{H}+{px + (pw - W) // 2}+{py + (ph - H) // 2}")
+        except Exception:
+            pass
+
+        ctk.CTkLabel(self, text=t("help_title"),
+                     font=ctk.CTkFont("Yu Gothic UI", 18, "bold"),
+                     text_color=PINK_TXT).pack(anchor="w", padx=20, pady=(16, 8))
+
+        body = ctk.CTkScrollableFrame(self, fg_color=CARD, corner_radius=14,
+                                      border_width=1, border_color=BORDER)
+        body.pack(fill="both", expand=True, padx=18, pady=(0, 12))
+        for i, (heading, text_body) in enumerate(HELP_SECTIONS.get(LANG, HELP_SECTIONS["ja"])):
+            ctk.CTkLabel(body, text=heading,
+                         font=ctk.CTkFont("Yu Gothic UI", 14, "bold"), text_color=LAV_TXT,
+                         anchor="w", justify="left", wraplength=560
+                         ).pack(fill="x", padx=14, pady=(16 if i else 12, 2))
+            ctk.CTkLabel(body, text=text_body,
+                         font=ctk.CTkFont("Yu Gothic UI", 12), text_color=TXT,
+                         anchor="w", justify="left", wraplength=560
+                         ).pack(fill="x", padx=14, pady=(0, 2))
+
+        brow = ctk.CTkFrame(self, fg_color="transparent")
+        brow.pack(fill="x", padx=18, pady=(0, 14))
+        ctk.CTkButton(brow, text=t("help_close"), command=self.destroy,
+                      font=ctk.CTkFont("Yu Gothic UI", 13, "bold"), fg_color=PINK,
+                      hover_color=PINK_HOV, text_color="#ffffff", corner_radius=20,
+                      height=38, width=120).pack(side="right")
+        self.transient(parent)
+        self.bind("<Escape>", lambda e: self.destroy())
+        self.after(60, self._post_init)
+
+    def _post_init(self):
+        try:
+            self.lift()
+            self.focus_force()
+            _ico = os.path.join(os.path.dirname(os.path.abspath(__file__)), "modecole.ico")
+            if os.path.isfile(_ico):
+                self.iconbitmap(_ico)
+        except Exception:
+            pass
+
+
 def copy_suggest(name):
     """コピー/派生のたたき台名（元の名前の末尾に -copy）。"""
     return f"{name}-copy"
@@ -697,6 +825,9 @@ class App:
         self.f_mut = ctk.CTkFont("Yu Gothic UI", 11)
         self.f_big = ctk.CTkFont("Yu Gothic UI", 16, "bold")
 
+    def show_help(self):
+        HelpDialog(self.root)
+
     def toggle_language(self):
         global LANG
         LANG = "en" if LANG == "ja" else "ja"
@@ -728,6 +859,10 @@ class App:
                                          border_color=BORDER, text_color=TXT, corner_radius=18)
         self.search_entry.pack(side="left", padx=(0, 8))
         self.search_entry.bind("<KeyRelease>", lambda e: self._render_list())
+        ctk.CTkButton(right, text=t("help_button"), command=self.show_help, font=self.f_row,
+                      fg_color="transparent", hover_color=LAV_HOV, text_color=LAV_TXT,
+                      border_width=1, border_color=LAV, corner_radius=18, height=34,
+                      width=96).pack(side="left", padx=(0, 8))
         ctk.CTkButton(right, text=t("lang_button"), command=self.toggle_language,
                       font=self.f_row, fg_color="transparent", hover_color=GHOST_HOV,
                       text_color=TXT_MUT, border_width=1, border_color=GHOST_BD,

@@ -49,6 +49,7 @@ you can delete, copy, rename models and edit their prompts — just pick one fro
 | 🆕 **Create variant** | Create a new model from an existing one with a new prompt |
 | 🖊️ **Edit prompt** | Rewrite and overwrite the system prompt of the selected model |
 | 🌐 **OpenWebUI sync** | Write the prompt to OpenWebUI as well, not just Ollama |
+| ❓ **In-app help** | A "❓ Help" button in the header shows how to use the app on the spot (JA/EN) |
 | 🗣️ **Japanese / English toggle** | Switch the UI language with one button in the header |
 
 ---
@@ -58,11 +59,12 @@ you can delete, copy, rename models and edit their prompts — just pick one fro
 | Requirement | Notes |
 |---|---|
 | **Windows** | Tested on Windows 10 / 11 |
-| **Python 3.8+** | Install from [python.org](https://www.python.org/). `tkinter` is bundled by default (no extra install needed) |
+| **Python 3.8+** | Install from [python.org](https://www.python.org/). `tkinter` is bundled with Python by default |
+| **CustomTkinter** | Used to draw the UI. Run `pip install customtkinter` once (or use the bundled `requirements.txt`) |
 | **Ollama** | Must be running on your PC (listening on `http://localhost:11434`) |
 | **OpenWebUI** (optional) | Only needed if you use the sync feature. Everything else works without it |
 
-> 💡 **No extra libraries to install.** This tool runs purely on what Python ships with (no `pip install` required).
+> 💡 **Run `pip install customtkinter` once before the first launch.** This tool uses CustomTkinter to draw its UI (the standard `tkinter` ships with Python, so it needs no separate install).
 
 ---
 
@@ -72,26 +74,32 @@ you can delete, copy, rename models and edit their prompts — just pick one fro
    Download from [python.org](https://www.python.org/downloads/) and install it.
    Tick **"Add Python to PATH"** during setup — it makes everything smoother later.
 
-2. **Install and start Ollama**
+2. **Install CustomTkinter**
+   In Command Prompt (or PowerShell), run this once:
+   ```
+   pip install customtkinter
+   ```
+   (Or, using the bundled file: `pip install -r requirements.txt`)
+
+3. **Install and start Ollama**
    Download from [ollama.com](https://ollama.com/), install it, and leave it running.
 
-3. **Put this tool's folder wherever you like**
+4. **Put this tool's folder wherever you like**
    You just need `ModeColle.py` and `run.bat` in the same folder.
 
-4. **(Optional) Prepare a config file to use OpenWebUI sync**
+5. **(Optional) Prepare a config file to use OpenWebUI sync**
    → See [About OpenWebUI integration](#about-openwebui-integration-important) for details.
 
 ---
 
 ## How to launch
 
-Just double-click **`run.bat`** in the same folder. It starts `ModeColle.py`.
-
-If it fails to start, the window stays open showing the error (`pause`), so you can read what went wrong.
+Just double-click **`run.bat`** in the same folder. It starts `ModeColle.py` without showing a black console window.
 
 Once it starts, it automatically begins loading your model list.
 
-> 💡 `run.bat` has a plain ASCII filename, so it launches fine even on systems that can't display Japanese.
+> 💡 If the window doesn't appear, make sure you ran `pip install customtkinter` (without it, the app exits silently).
+> `run.bat` has a plain ASCII filename, so it launches fine even on systems that can't display Japanese.
 
 ---
 
