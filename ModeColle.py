@@ -442,21 +442,21 @@ BORDER    = "#ece4f0"
 TXT       = "#3d3447"
 TXT_MUT   = "#9a8ea6"
 TXT_HINT  = "#bcb1c6"
-PINK      = "#ec86b0"
-PINK_HOV  = "#e3719f"
+PINK      = "#EA4C9D"   # ブランド基準ピンク（CTA/ロゴ/選択中）
+PINK_HOV  = "#D43A87"   # ホバー＝一段濃いピンク
 PINK_TXT  = "#7c2b50"
-PINK_SOFT = "#fdeaf2"
+PINK_SOFT = "#FBE3F1"   # 選択行・淡ピンク面（ブランド共通トークン）
 PINK_FLASH = "#fbeef5"
-LAV       = "#a98fe0"
-LAV_HOV   = "#efe9fb"
-LAV_TXT   = "#6f54bf"
+LAV       = "#8B7EE8"   # ブランド基準ラベンダー（副アクセント）
+LAV_HOV   = "#F3EFFC"   # 淡ラベンダー面（ゴーストhover）
+LAV_TXT   = "#6E5FD0"   # ラベンダー文字
 RED       = "#e06d6d"
 RED_HOV   = "#fbeaea"
 RED_BD    = "#eeb4b4"
 GHOST_BD  = "#e6dcec"
 GHOST_HOV = "#f4eef7"
-CHIP_BG   = "#e9f1fc"
-CHIP_TX   = "#3f72b0"
+CHIP_BG   = "#F3EFFC"   # WebUI同期バッジ＝ラベンダー淡ピル（青→ブランド統一）
+CHIP_TX   = "#6E5FD0"
 OK_GREEN  = "#3a9e78"
 WARN_AMBER = "#c98a2a"
 
@@ -671,6 +671,10 @@ class App:
         self.root.geometry("1140x760")
         self.root.minsize(960, 640)
         self.root.configure(fg_color=WIN_BG)
+        _ico = os.path.join(os.path.dirname(os.path.abspath(__file__)), "modecole.ico")
+        if os.path.isfile(_ico):
+            self.root.iconbitmap(_ico)
+            self.root.after(200, lambda: self.root.iconbitmap(_ico))
         self.models = []
         self.selected_model = None
         self.owui_prompt_set = set()
