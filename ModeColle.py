@@ -46,6 +46,14 @@ TR = {
         "import_row_fail": "❌ 失敗: {e}",
         "import_finished": "✅ 取り込み完了：成功 {ok} 件／失敗 {fail} 件",
         "import_status_done": "✅ LM Studio から {ok} 件取り込みました",
+        "import_cancel": "⏹ 中止",
+        "import_cancelling": "中止中…",
+        "import_importing": "取り込み中…",
+        "import_del_source": "取り込んだら LM Studio の元ファイルも削除（容量を2倍にしない）",
+        "import_confirm_title": "取り込みの確認",
+        "import_confirm": "{n} 個のモデル（合計 {size}）を Ollama に取り込みます。\n\n⚠️ Ollama 側に実体がコピーされるので、その分ディスクを使います。\n\n取り込みますか？",
+        "import_confirm_delsrc": "\n\n🗑 取り込み後、LM Studio の元ファイルも削除します（戻せません）。",
+        "import_cancelled": "⏹ 中止しました（成功 {ok} 件／失敗 {fail} 件）",
         "refresh": "🔄 更新",
         "legend_dup": "■ 同じハッシュ = 同じ実体（重複）",
         "legend_owui": "🌐 = OpenWebUI側にもプロンプト設定済み",
@@ -181,6 +189,14 @@ TR = {
         "import_row_fail": "❌ failed: {e}",
         "import_finished": "✅ Import finished: {ok} succeeded / {fail} failed",
         "import_status_done": "✅ Imported {ok} model(s) from LM Studio",
+        "import_cancel": "⏹ Cancel",
+        "import_cancelling": "Cancelling…",
+        "import_importing": "Importing…",
+        "import_del_source": "Delete the LM Studio source file after import (avoid doubling disk)",
+        "import_confirm_title": "Confirm import",
+        "import_confirm": "Import {n} model(s) ({size} total) into Ollama.\n\n⚠️ The data is copied into Ollama, using that much disk.\n\nProceed?",
+        "import_confirm_delsrc": "\n\n🗑 The LM Studio source files will be deleted after import (cannot be undone).",
+        "import_cancelled": "⏹ Cancelled ({ok} succeeded / {fail} failed)",
         "refresh": "🔄 Refresh",
         "legend_dup": "■ Same hash = same data (duplicate)",
         "legend_owui": "🌐 = Prompt also set on OpenWebUI",
@@ -611,11 +627,19 @@ def _cleanup_orphan_blob(digest: str):
         pass
 
 
-def ollama_import_gguf(name: str, gguf_path: str, on_progress=None):
-    """GGUF ファイルを Ollama に取り込む（blob アップロード → create → 孤児blob掃除）。"""
+class ImportCancelled(Exception):
+    """取り込みがユーザーにより中止された。"""
+
+
+def ollama_import_gguf(name: str, gguf_path: str, on_progress=None, should_cancel=None):
+    """GGUF ファイルを Ollama に取り込む（blob アップロード → create → 孤児blob掃除）。
+    should_cancel() が True を返したら ImportCancelled を投げて中断する
+    （※巨大ファイルの blob アップロード中は中断できず、その後の create 段階から効く）。"""
     if on_progress:
         on_progress("uploading")
     digest = ollama_blob_upload(gguf_path)
+    if should_cancel and should_cancel():
+        raise ImportCancelled()
     fname = os.path.basename(gguf_path)
     data = {"model": name, "files": {fname: "sha256:" + digest}, "stream": True}
     body = json.dumps(data).encode()
@@ -623,6 +647,8 @@ def ollama_import_gguf(name: str, gguf_path: str, on_progress=None):
                                  headers={"Content-Type": "application/json"})
     with urllib.request.urlopen(req, timeout=3600) as r:
         for line in r:
+            if should_cancel and should_cancel():
+                raise ImportCancelled()
             if not line.strip():
                 continue
             try:
@@ -991,6 +1017,8 @@ class ImportDialog(ctk.CTkToplevel):
         self.on_done = on_done
         self.rows = []
         self.importing = False
+        self._cancel = False
+        self.del_source = tk.BooleanVar(value=False)
         self.title(t("import_title"))
         self.configure(fg_color=WIN_BG)
         W, H = 780, 640
@@ -1031,6 +1059,12 @@ class ImportDialog(ctk.CTkToplevel):
         body.pack(fill="both", expand=True, padx=18, pady=(8, 8))
         for m in models:
             self._add_row(body, m)
+
+        self.chk_del = ctk.CTkCheckBox(self, text=t("import_del_source"), variable=self.del_source,
+                                       font=ctk.CTkFont("Yu Gothic UI", 11), fg_color=RED,
+                                       hover_color=RED_BD, border_color=GHOST_BD,
+                                       checkmark_color="#ffffff", text_color=TXT_MUT)
+        self.chk_del.pack(anchor="w", padx=20, pady=(2, 2))
 
         self.status_lbl = ctk.CTkLabel(self, text="", font=ctk.CTkFont("Yu Gothic UI", 11),
                                        text_color=OK_GREEN, anchor="w", justify="left",
@@ -1102,15 +1136,35 @@ class ImportDialog(ctk.CTkToplevel):
             if not r["name_var"].get().strip():
                 messagebox.showwarning(t("import_title"), t("import_bad_name"), parent=self)
                 return
+        # 実行前の確認（個数・合計容量・元ファイル削除の有無を提示）
+        total = sum(r["data"]["size"] for r in chosen)
+        msg = t("import_confirm", n=len(chosen), size=fmt_size(total))
+        if self.del_source.get():
+            msg += t("import_confirm_delsrc")
+        if not messagebox.askyesno(t("import_confirm_title"), msg, parent=self):
+            return
         self.importing = True
-        self.btn_import.configure(state="disabled")
-        self.btn_close.configure(state="disabled")
+        self._cancel = False
+        self.chk_del.configure(state="disabled")
+        self.btn_import.configure(state="disabled", text=t("import_importing"))
+        self.btn_close.configure(state="normal", text=t("import_cancel"), command=self._cancel_import,
+                                 text_color=RED, border_color=RED_BD, hover_color=RED_HOV)
         threading.Thread(target=self._worker, args=(chosen,), daemon=True).start()
+
+    def _cancel_import(self):
+        if not self.importing:
+            return
+        self._cancel = True
+        self.btn_close.configure(state="disabled", text=t("import_cancelling"))
 
     def _worker(self, chosen):
         ok = fail = 0
+        cancelled = False
         n = len(chosen)
         for i, r in enumerate(chosen, 1):
+            if self._cancel:
+                cancelled = True
+                break
             name = r["name_var"].get().strip()
             path = r["data"]["path"]
 
@@ -1120,28 +1174,45 @@ class ImportDialog(ctk.CTkToplevel):
                 self.after(0, lambda: r["status"].configure(text=status, text_color=LAV_TXT))
 
             try:
-                ollama_import_gguf(name, path, on_progress=prog)
+                ollama_import_gguf(name, path, on_progress=prog, should_cancel=lambda: self._cancel)
                 ok += 1
+                # 「元ファイルも削除」がONなら、取り込み成功後に LM Studio の .gguf を消す
+                if self.del_source.get():
+                    try:
+                        os.remove(path)
+                    except OSError:
+                        pass
                 self.after(0, lambda r=r: r["status"].configure(text=t("import_row_done"),
                                                                 text_color=OK_GREEN))
+            except ImportCancelled:
+                cancelled = True
+                self.after(0, lambda r=r: r["status"].configure(text="", text_color=TXT_MUT))
+                break
             except Exception as e:
                 fail += 1
                 msg = str(e)
                 self.after(0, lambda r=r, msg=msg: r["status"].configure(
                     text=t("import_row_fail", e=msg[:24]), text_color=RED))
-        self.after(0, lambda: self._finish(ok, fail))
+        self.after(0, lambda: self._finish(ok, fail, cancelled))
 
-    def _finish(self, ok, fail):
+    def _finish(self, ok, fail, cancelled=False):
         self.importing = False
-        self.btn_close.configure(state="normal")
-        self.btn_import.configure(state="normal")
-        self.status_lbl.configure(text=t("import_finished", ok=ok, fail=fail),
-                                  text_color=OK_GREEN if fail == 0 else WARN_AMBER)
+        self._cancel = False
+        self.chk_del.configure(state="normal")
+        self.btn_import.configure(state="normal", text=t("import_do"))
+        self.btn_close.configure(state="normal", text=t("import_close"), command=self._close,
+                                 text_color=TXT_MUT, border_color=GHOST_BD, hover_color=GHOST_HOV)
+        if cancelled:
+            self.status_lbl.configure(text=t("import_cancelled", ok=ok, fail=fail), text_color=WARN_AMBER)
+        else:
+            self.status_lbl.configure(text=t("import_finished", ok=ok, fail=fail),
+                                      text_color=OK_GREEN if fail == 0 else WARN_AMBER)
         if self.on_done:
             self.on_done(ok)
 
     def _close(self):
         if self.importing:
+            self._cancel_import()  # 取り込み中の×は「中止」として扱う（窓は中止完了後に手動で閉じる）
             return
         self.destroy()
 
