@@ -2,21 +2,45 @@
 
 <p align="center"><a href="README.md">日本語</a> ｜ <b>English</b></p>
 
-## "I set the system prompt… so why isn't it working?" 🤔
+**A Windows GUI tool for managing your Ollama models with just the mouse.**
+Without memorizing any commands (typing into that scary black terminal window), you can
+**list, inspect, delete, copy, rename, and edit the prompts** of your models — just pick one and click.
 
-If you've ever edited a model's system prompt in Ollama, opened Open WebUI, and found your prompt **completely ignored** — you're not imagining it.
+On top of that —
 
-Open WebUI (v0.4+) doesn't read the system prompt baked into an Ollama model. It keeps its **own** copy, in its **own** database. So your carefully written prompt just sits in Ollama, doing nothing.
+- 🌐 Push the same prompt to **OpenWebUI** in one click (solves the "prompt won't take effect" problem below)
+- 📥 Import models you downloaded in **LM Studio** so they show up in the list
+- 🎨 Spot **duplicate models** (identical contents) at a glance via color coding
 
-I lost an evening to this. Even asking AI chatbots didn't surface the real reason. So I built **ModeColle** 🦙 — a small, free Windows tool that writes your system prompt to **both Ollama and Open WebUI in one click**, so what you set is what you get.
+![ModeColle screen](docs/screenshot-main.png)
 
 ---
 
-**A Windows GUI tool for managing your Ollama models with just the mouse.**
-On top of that, you can read and write **OpenWebUI system prompts** directly from the same screen.
+## Try it in 30 seconds (Quick start)
 
-Without memorizing any commands (typing into that scary black terminal window),
-you can delete, copy, rename models and edit their prompts — just pick one from the list and click a button.
+> Assumes **Python** and **Ollama** are installed (→ see [How to install](#how-to-install) for details)
+
+1. In Command Prompt, run `pip install customtkinter` **once**
+2. **Double-click** `run.bat` to launch
+3. **Click a model** in the left list → details (size, suggested use, built-in prompt) appear on the right
+   — that alone already lets you read what's inside each model
+4. From there, use the bottom-right buttons to **copy, rename, edit the prompt**, and so on
+
+No commands, ever.
+
+> 💡 Stuck? The **"❓ Help"** button in the header shows how to use the app, right inside it (JA / EN).
+>
+> ![In-app help](docs/screenshot-help.png)
+
+---
+
+## Why I made it — "I set the system prompt… so why isn't it working?" 🤔
+
+If you've ever edited a model's system prompt in Ollama, opened OpenWebUI, and found your prompt **completely ignored** — you're not imagining it.
+
+OpenWebUI (v0.4+) doesn't read the system prompt baked into an Ollama model. It keeps its **own** copy, in its **own** database. So your carefully written prompt just sits in Ollama, doing nothing.
+
+I lost an evening to this. Even asking AI chatbots didn't surface the real reason. So I built **ModeColle** 🦙 — a small, free Windows tool that writes your system prompt to **both Ollama and OpenWebUI in one click**, so what you set is what you get.
 
 ---
 
@@ -28,6 +52,7 @@ you can delete, copy, rename models and edit their prompts — just pick one fro
 - [How to launch](#how-to-launch)
 - [Reading the screen](#reading-the-screen)
 - [How to use the buttons](#how-to-use-the-buttons)
+- [Import from LM Studio](#-import-from-lm-studio)
 - [About OpenWebUI integration (important)](#about-openwebui-integration-important)
 - [About duplicate-model color coding](#about-duplicate-model-color-coding)
 - [FAQ / Troubleshooting](#faq--troubleshooting)
@@ -48,6 +73,7 @@ you can delete, copy, rename models and edit their prompts — just pick one fro
 | ✏️ **Rename** | Rename safely (backup → verify → swap) |
 | 🆕 **Create variant** | Create a new model from an existing one with a new prompt |
 | 🖊️ **Edit prompt** | Rewrite and overwrite the system prompt of the selected model |
+| 📥 **LM Studio import** | Bring `.gguf` files downloaded in LM Studio into Ollama and the list |
 | 🌐 **OpenWebUI sync** | Write the prompt to OpenWebUI as well, not just Ollama |
 | ❓ **In-app help** | A "❓ Help" button in the header shows how to use the app on the spot (JA/EN) |
 | 🗣️ **Japanese / English toggle** | Switch the UI language with one button in the header |
@@ -111,20 +137,21 @@ The window has three parts: a **header on top**, a **model list on the left**, a
 
 - **🦙 ModeColle** … the title
 - **Status** … shows what it's doing right now (loading / success / error) in color
+- **📥 Import** … imports LM Studio models into Ollama ([details here](#-import-from-lm-studio))
+- **❓ Help** … shows how to use the app, inside the app
 - **🌐 EN / 日本語** … toggles the UI language between Japanese and English (switches each time you press it)
 - **🔄 Refresh** … reloads the list to the latest state
-- **Legend (right side)**
+- **Legend (left side)**
   - 🌐 = a prompt is also set on the OpenWebUI side
-  - ■ rows with the same color = the same underlying model (duplicate contents)
+  - colored rows = the same underlying model (duplicate contents)
 
 ### Left: Registered model list
 
 | Column | Meaning |
 |---|---|
 | **Model name** | The name registered in Ollama |
-| **Size** | Disk usage (GB / MB) |
-| **Hash (first 12)** | First 12 chars of the content identifier. **Same = identical contents** |
 | **WebUI** | If 🌐 is shown, a system prompt is also set on the OpenWebUI side |
+| **Size** | Disk usage (GB / MB) |
 
 Click a row to see detailed info on the right.
 
@@ -132,23 +159,32 @@ Click a row to see detailed info on the right.
 
 - 📛 **Full name**
 - 💾 **Size**
-- 🔑 **Hash** (full)
 - 🎯 **Recommended use** (auto-guessed from the name)
-- 📊 **Model info** (family / parameter count / quantization / format)
+- 🌐 **OpenWebUI** (whether it's set)
+- 🔑 **Hash** (the content identifier)
 - 📋 **Built-in prompt** (the system prompt embedded in that model)
 
 ---
 
 ## How to use the buttons
 
-The buttons are laid out in two rows at the bottom left. **Select one model from the list first,** then click.
+The buttons are at the bottom right. **Select one model from the list first,** then click.
 
-### 🗑️ Delete
-Deletes the selected model. A confirmation dialog appears. **This cannot be undone,** so be careful.
+### 🖊️ Edit prompt
+Rewrites and overwrites the system prompt of **the currently selected model itself**.
+The name does not change. You can choose Ollama / OpenWebUI as the save target.
+
+### 🆕 Create variant
+Creates a **separate model** based on an existing one, with a new system prompt.
+
+- Base model … the model to build on
+- New model name … the name to create (e.g. `magnum-v2-SD:latest`)
+- Save target … see [OpenWebUI integration](#about-openwebui-integration-important)
+- System prompt … the instruction text you want to give it
 
 ### 📋 Copy
 Makes **another model under a different name** with the same contents.
-The contents are shared, so **disk usage does not increase** (it just references the same files under a new name).
+The contents are shared, so **disk usage barely increases** (it just references the same data under a new name).
 You'll be asked for the new name (e.g. `magnum-v2-SD:latest`).
 
 ### ✏️ Rename
@@ -161,17 +197,24 @@ Renames a model. Ollama has no direct "rename" feature, so internally it runs th
 
 If something fails midway, the backup remains so you don't lose data.
 
-### 🆕 Create variant
-Creates a **separate model** based on an existing one, with a new system prompt.
+### 🗑️ Delete
+Deletes the selected model. A confirmation dialog appears. **This cannot be undone,** so be careful.
 
-- Base model … the model to build on
-- New model name … the name to create (e.g. `magnum-v2-SD:latest`)
-- Save target … see [OpenWebUI integration](#about-openwebui-integration-important)
-- System prompt … the instruction text you want to give it
+---
 
-### 🖊️ Edit prompt
-Rewrites and overwrites the system prompt of **the currently selected model itself**.
-The name does not change. You can choose Ollama / OpenWebUI as the save target.
+## 📥 Import from LM Studio
+
+Models you downloaded in LM Studio (`.gguf` files) **don't show up in ModeColle (i.e. Ollama) on their own.**
+LM Studio and Ollama are separate apps with separate storage, so pressing "🔄 Refresh" won't surface them.
+
+Press **"📥 Import"** in the header and ModeColle **scans your LM Studio folder automatically**, listing what it finds as a checklist.
+Tick the ones you want and press **"📥 Import"** — they get imported into Ollama and appear in the list.
+A name is suggested automatically and is **editable on the spot** (e.g. `qwen3-coder:q4_k_m`).
+
+> ⚠️ **About disk usage (how it differs from "📋 Copy")**
+> - **"📋 Copy"** just points to the **same data under a new name** inside Ollama, so it barely uses extra space.
+> - **"📥 Import"** brings an **external file into Ollama as real data**, so it uses disk for the whole model.
+>   The original file also stays in LM Studio, so the same model ends up stored in two places.
 
 ---
 
@@ -275,15 +318,20 @@ The status bar at the bottom also shows a count like "Duplicate groups: N."
 
 ## FAQ / Troubleshooting
 
-**Q. It closes immediately when I launch it**
-A. Check that Python is installed correctly (if `python --version` prints something in Command Prompt, you're good).
-`run.bat` keeps the window open on error, so if there's a red message, that's your clue.
+**Q. It closes immediately when I launch it / the window doesn't appear**
+A. Make sure you ran `pip install customtkinter`. `run.bat` launches without a console window, so if the library is missing the app just exits quietly. You can verify Python itself with `python --version`.
 
 **Q. I want the screen in English / back to Japanese**
 A. Press the **🌐 button** in the header (labeled "EN" or "日本語") to toggle the UI language.
 
-**Q. It says "Connection error"**
+**Q. I forgot how to use it**
+A. Press the **"❓ Help"** button in the header — the usage guide appears inside the app (JA / EN).
+
+**Q. It says "Connection error" / no models show up**
 A. Check that Ollama is running (`http://localhost:11434`).
+
+**Q. My LM Studio models don't appear in the list**
+A. Import them via **"📥 Import"** in the header. "🔄 Refresh" alone won't show them (LM Studio and Ollama are separate). See [Import from LM Studio](#-import-from-lm-studio).
 
 **Q. 🌐 doesn't appear / it's not reflected in OpenWebUI**
 A. Check the following:
@@ -295,10 +343,9 @@ A. Check the following:
 A. **Reload the OpenWebUI page with F5 ♡**
 OpenWebUI's web page does not automatically reflect changes written from outside by ModeColle (a stale view remains).
 If 🌐 is showing, the data is already saved in OpenWebUI. Reopen the page and it will display properly.
-**You do not need to manually save (handshake) from the admin panel yourself.**
 
 **Q. Can I use it without OpenWebUI?**
-A. Yes. Everything except the integration (list / delete / copy / rename / create variant / the Ollama part of prompt editing)
+A. Yes. Everything except the integration (list / delete / copy / rename / create variant / prompt editing / LM Studio import)
 works without `openwebui_config.json`.
 
 **Q. The rename failed midway**
