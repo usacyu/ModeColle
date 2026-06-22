@@ -8,6 +8,8 @@ import urllib.request
 import urllib.error
 import json
 import os
+import re
+import hashlib
 import threading
 import customtkinter as ctk
 
@@ -25,6 +27,25 @@ TR = {
         "help_button": "❓ ヘルプ",
         "help_title": "❓ もでコレの使い方",
         "help_close": "閉じる",
+        "import_button": "📥 取り込み",
+        "import_title": "📥 LM Studio から取り込み",
+        "import_note": "⚠️ 取り込むと Ollama 側にも実体がコピーされます（LM Studio とで容量が二重になります）。",
+        "import_col_name": "取り込み後の名前（編集できます）",
+        "import_select_all": "全選択",
+        "import_clear_all": "全解除",
+        "import_do": "📥 取り込む",
+        "import_close": "閉じる",
+        "import_already": "既にOllamaにあります",
+        "import_no_folder": "LM Studio のモデルフォルダが見つかりませんでした。\nLM Studio をインストールし、モデルをダウンロードしているか確認してください。",
+        "import_none_found": "LM Studio に取り込めるモデル（.gguf）が見つかりませんでした。",
+        "import_nothing_checked": "取り込むモデルにチェックを入れてください。",
+        "import_bad_name": "名前が空のモデルがあります。名前を入れてください。",
+        "import_found": "{n} 個のモデルが見つかりました（容量の小さい順ではありません）",
+        "import_progress": "[{i}/{n}] {name} … {status}",
+        "import_row_done": "✅ 完了",
+        "import_row_fail": "❌ 失敗: {e}",
+        "import_finished": "✅ 取り込み完了：成功 {ok} 件／失敗 {fail} 件",
+        "import_status_done": "✅ LM Studio から {ok} 件取り込みました",
         "refresh": "🔄 更新",
         "legend_dup": "■ 同じハッシュ = 同じ実体（重複）",
         "legend_owui": "🌐 = OpenWebUI側にもプロンプト設定済み",
@@ -141,6 +162,25 @@ TR = {
         "help_button": "❓ Help",
         "help_title": "❓ How to use ModeColle",
         "help_close": "Close",
+        "import_button": "📥 Import",
+        "import_title": "📥 Import from LM Studio",
+        "import_note": "⚠️ Importing copies the model into Ollama as well (it uses disk space in both LM Studio and Ollama).",
+        "import_col_name": "Name in Ollama (editable)",
+        "import_select_all": "Select all",
+        "import_clear_all": "Clear",
+        "import_do": "📥 Import",
+        "import_close": "Close",
+        "import_already": "already in Ollama",
+        "import_no_folder": "Could not find the LM Studio models folder.\nMake sure LM Studio is installed and you have downloaded a model.",
+        "import_none_found": "No importable models (.gguf) were found in LM Studio.",
+        "import_nothing_checked": "Please check at least one model to import.",
+        "import_bad_name": "Some models have an empty name. Please enter a name.",
+        "import_found": "Found {n} model(s)",
+        "import_progress": "[{i}/{n}] {name} … {status}",
+        "import_row_done": "✅ done",
+        "import_row_fail": "❌ failed: {e}",
+        "import_finished": "✅ Import finished: {ok} succeeded / {fail} failed",
+        "import_status_done": "✅ Imported {ok} model(s) from LM Studio",
         "refresh": "🔄 Refresh",
         "legend_dup": "■ Same hash = same data (duplicate)",
         "legend_owui": "🌐 = Prompt also set on OpenWebUI",
@@ -285,8 +325,15 @@ HELP_SECTIONS = {
         ("色分け（重複の発見）",
          "一覧で同じ色がついたモデル同士は、中身（ハッシュ）が同じ＝別名で二重登録されているという印です。"
          "容量を節約したいときの、整理の目印になります。"),
+        ("LM Studio のモデルを取り込む",
+         "LM Studio でダウンロードしたモデル（.gguf）は、そのままでは ModeColle に出てきません"
+         "（別アプリで保管場所が違うため）。\n"
+         "一覧の上の「📥 取り込み」ボタンを押すと、LM Studio のモデルを自動で探して一覧表示します。"
+         "取り込みたいものにチェック→「📥 取り込む」で Ollama に取り込まれ、一覧に出ます（名前はその場で編集可）。\n"
+         "⚠️ 取り込むと Ollama 側にも実体がコピーされるので、LM Studio とで容量が二重になります。"),
         ("困ったとき",
          "・モデルが出てこない → Ollama が起動しているか確認（http://localhost:11434）\n"
+         "・LM Studioのモデルが無い → 上の「📥 取り込み」で取り込む（更新だけでは出ません）\n"
          "・OpenWebUI に繋がらない → 本体と同じフォルダの openwebui_config.json の URL と API キーを確認\n"
          "・起動しない → 「pip install customtkinter」を実行したか確認"),
     ],
@@ -316,8 +363,16 @@ HELP_SECTIONS = {
         ("Color coding (spotting duplicates)",
          "Models that share the same color in the list have the same content (same hash) = registered "
          "twice under different names. A handy marker when you want to clean up and save space."),
+        ("Import models from LM Studio",
+         "Models you downloaded in LM Studio (.gguf) don't show up in ModeColle on their own "
+         "(it's a separate app with its own storage).\n"
+         "Click the \"📥 Import\" button above the list to auto-detect LM Studio models. Check the "
+         "ones you want and press \"📥 Import\" - they get imported into Ollama and appear in the list "
+         "(you can edit the name on the spot).\n"
+         "⚠️ Importing copies the model into Ollama too, so it uses disk space in both LM Studio and Ollama."),
         ("Troubleshooting",
          "- No models show up -> check that Ollama is running (http://localhost:11434)\n"
+         "- An LM Studio model is missing -> import it with \"📥 Import\" above (Refresh alone won't show it)\n"
          "- Can't reach OpenWebUI -> check the URL and API key in openwebui_config.json (same folder as the app)\n"
          "- App won't start -> make sure you ran \"pip install customtkinter\""),
     ],
@@ -434,6 +489,152 @@ def ollama_delete(path: str, data: dict):
                                  headers={"Content-Type": "application/json"})
     with urllib.request.urlopen(req, timeout=10) as r:
         return r.status
+
+
+# ── LM Studio からの取り込み ────────────────────────────────────────────────
+# LM Studio は GGUF ファイルを独自フォルダに保管する（Ollama とは別管理）。
+# ここでそのフォルダを走査し、見つけた .gguf を Ollama へ取り込む（blob→create）。
+
+def lmstudio_models_dir():
+    """LM Studio のモデル保管フォルダを返す（無ければ None）。"""
+    home = os.path.expanduser("~")
+    for c in (os.path.join(home, ".lmstudio", "models"),
+              os.path.join(home, ".cache", "lm-studio", "models")):
+        if os.path.isdir(c):
+            return c
+    return None
+
+
+_QUANT_RE = re.compile(r'(?i)((?:UD[-_])?(?:IQ|Q|TQ)\d[0-9a-z_]*|f16|bf16|fp16)')
+
+
+def _sanitize_name(s: str) -> str:
+    """Ollama のモデル名に使える形へ（小文字・記号は - に）。"""
+    s = re.sub(r'[^a-z0-9._-]+', '-', s.lower()).strip('-.')
+    s = re.sub(r'-{2,}', '-', s)
+    return s or "model"
+
+
+def suggest_ollama_name(repo: str, filename: str) -> str:
+    """リポジトリ名＋量子化から取り込み後の名前を提案（例: magnum-12b-v2:q5_k_m）。"""
+    base = re.sub(r'[-_]?gguf$', '', repo, flags=re.IGNORECASE)
+    base = _sanitize_name(base)
+    stem = os.path.splitext(filename)[0]
+    m = _QUANT_RE.search(stem)
+    tag = _sanitize_name(m.group(1)) if m else "latest"
+    return f"{base}:{tag}"
+
+
+def scan_lmstudio_models():
+    """LM Studio フォルダ内の .gguf を一覧化。フォルダが無ければ None を返す。
+    mmproj（マルチモーダル補助ファイル＝モデル本体ではない）は除外する。"""
+    root_dir = lmstudio_models_dir()
+    if not root_dir:
+        return None
+    found = []
+    for root, _dirs, files in os.walk(root_dir):
+        for fn in files:
+            low = fn.lower()
+            if not low.endswith(".gguf") or low.startswith("mmproj"):
+                continue
+            path = os.path.join(root, fn)
+            rel = os.path.relpath(path, root_dir)
+            parts = rel.split(os.sep)
+            publisher = parts[0] if len(parts) >= 2 else ""
+            repo = parts[-2] if len(parts) >= 2 else os.path.basename(root)
+            try:
+                size = os.path.getsize(path)
+            except OSError:
+                size = 0
+            found.append({"path": path, "publisher": publisher, "repo": repo,
+                          "filename": fn, "size": size,
+                          "suggested": suggest_ollama_name(repo, fn)})
+    found.sort(key=lambda x: (x["repo"].lower(), x["filename"].lower()))
+    return found
+
+
+def ollama_blob_upload(path: str) -> str:
+    """ファイルを sha256 で blob 登録し、digest を返す。大きいファイルもストリーム送信。"""
+    h = hashlib.sha256()
+    with open(path, "rb") as f:
+        for chunk in iter(lambda: f.read(1024 * 1024), b""):
+            h.update(chunk)
+    digest = h.hexdigest()
+    url = OLLAMA_BASE + "/api/blobs/sha256:" + digest
+    # 既にサーバ側にある blob は再送しない（送るとサーバが即応答して接続リセットになる＆無駄）
+    try:
+        urllib.request.urlopen(urllib.request.Request(url, method="HEAD"), timeout=30).close()
+        return digest
+    except urllib.error.HTTPError as e:
+        if e.code != 404:
+            raise
+    size = os.path.getsize(path)
+    with open(path, "rb") as f:
+        req = urllib.request.Request(url, data=f, method="POST")
+        req.add_header("Content-Type", "application/octet-stream")
+        req.add_header("Content-Length", str(size))
+        urllib.request.urlopen(req, timeout=3600).close()
+    return digest
+
+
+def _ollama_models_dir():
+    """Ollama のモデル保管フォルダ（OLLAMA_MODELS 環境変数 か ~/.ollama/models）。"""
+    d = os.environ.get("OLLAMA_MODELS")
+    if d and os.path.isdir(d):
+        return d
+    d = os.path.join(os.path.expanduser("~"), ".ollama", "models")
+    return d if os.path.isdir(d) else None
+
+
+def _cleanup_orphan_blob(digest: str):
+    """取り込み時にアップロードした元 blob が、Ollama の変換後どのモデルからも参照されていなければ
+    削除して容量を戻す。Ollama には blob 削除 API が無いためファイルを直接消す。
+    localhost 運用前提・best-effort（失敗しても取り込み自体は成功）。"""
+    try:
+        md = _ollama_models_dir()
+        if not md:
+            return
+        manifests = os.path.join(md, "manifests")
+        if os.path.isdir(manifests):
+            for root, _d, files in os.walk(manifests):
+                for fn in files:
+                    try:
+                        with open(os.path.join(root, fn), encoding="utf-8", errors="ignore") as f:
+                            if digest in f.read():
+                                return  # まだどこかのモデルが使っている＝消さない
+                    except OSError:
+                        pass
+        blob = os.path.join(md, "blobs", "sha256-" + digest)
+        if os.path.isfile(blob):
+            os.remove(blob)
+    except Exception:
+        pass
+
+
+def ollama_import_gguf(name: str, gguf_path: str, on_progress=None):
+    """GGUF ファイルを Ollama に取り込む（blob アップロード → create → 孤児blob掃除）。"""
+    if on_progress:
+        on_progress("uploading")
+    digest = ollama_blob_upload(gguf_path)
+    fname = os.path.basename(gguf_path)
+    data = {"model": name, "files": {fname: "sha256:" + digest}, "stream": True}
+    body = json.dumps(data).encode()
+    req = urllib.request.Request(OLLAMA_BASE + "/api/create", data=body, method="POST",
+                                 headers={"Content-Type": "application/json"})
+    with urllib.request.urlopen(req, timeout=3600) as r:
+        for line in r:
+            if not line.strip():
+                continue
+            try:
+                obj = json.loads(line)
+                if on_progress and obj.get("status"):
+                    on_progress(obj["status"])
+                if "error" in obj:
+                    raise RuntimeError(obj["error"])
+            except json.JSONDecodeError:
+                pass
+    # 変換でアップロード元 blob が孤児化していたら掃除（参照が残っていれば消さない）
+    _cleanup_orphan_blob(digest)
 
 
 # ── OpenWebUI 連携 ────────────────────────────────────────────────────────
@@ -781,6 +982,170 @@ class HelpDialog(ctk.CTkToplevel):
             pass
 
 
+class ImportDialog(ctk.CTkToplevel):
+    """LM Studio の GGUF を選んで Ollama に取り込むダイアログ。"""
+
+    def __init__(self, parent, models, existing_names, on_done):
+        super().__init__(parent)
+        self.existing = existing_names
+        self.on_done = on_done
+        self.rows = []
+        self.importing = False
+        self.title(t("import_title"))
+        self.configure(fg_color=WIN_BG)
+        W, H = 780, 640
+        self.geometry(f"{W}x{H}")
+        self.minsize(640, 480)
+        self.update_idletasks()
+        try:
+            px, py = parent.winfo_rootx(), parent.winfo_rooty()
+            pw, ph = parent.winfo_width(), parent.winfo_height()
+            self.geometry(f"{W}x{H}+{px + (pw - W) // 2}+{py + (ph - H) // 2}")
+        except Exception:
+            pass
+
+        ctk.CTkLabel(self, text=t("import_title"),
+                     font=ctk.CTkFont("Yu Gothic UI", 18, "bold"),
+                     text_color=PINK_TXT).pack(anchor="w", padx=20, pady=(16, 0))
+        ctk.CTkLabel(self, text=t("import_found", n=len(models)),
+                     font=ctk.CTkFont("Yu Gothic UI", 11), text_color=TXT_MUT,
+                     anchor="w").pack(anchor="w", padx=20, pady=(2, 0))
+        ctk.CTkLabel(self, text=t("import_note"), font=ctk.CTkFont("Yu Gothic UI", 11),
+                     text_color=WARN_AMBER, anchor="w", justify="left",
+                     wraplength=W - 60).pack(anchor="w", padx=20, pady=(4, 8))
+
+        topbar = ctk.CTkFrame(self, fg_color="transparent")
+        topbar.pack(fill="x", padx=18)
+        ctk.CTkButton(topbar, text=t("import_select_all"), command=lambda: self._set_all(True),
+                      font=ctk.CTkFont("Yu Gothic UI", 11), fg_color="transparent",
+                      hover_color=GHOST_HOV, text_color=TXT_MUT, border_width=1,
+                      border_color=GHOST_BD, corner_radius=14, height=28,
+                      width=80).pack(side="left", padx=(0, 6))
+        ctk.CTkButton(topbar, text=t("import_clear_all"), command=lambda: self._set_all(False),
+                      font=ctk.CTkFont("Yu Gothic UI", 11), fg_color="transparent",
+                      hover_color=GHOST_HOV, text_color=TXT_MUT, border_width=1,
+                      border_color=GHOST_BD, corner_radius=14, height=28, width=80).pack(side="left")
+
+        body = ctk.CTkScrollableFrame(self, fg_color=CARD, corner_radius=14,
+                                      border_width=1, border_color=BORDER)
+        body.pack(fill="both", expand=True, padx=18, pady=(8, 8))
+        for m in models:
+            self._add_row(body, m)
+
+        self.status_lbl = ctk.CTkLabel(self, text="", font=ctk.CTkFont("Yu Gothic UI", 11),
+                                       text_color=OK_GREEN, anchor="w", justify="left",
+                                       wraplength=W - 60)
+        self.status_lbl.pack(fill="x", padx=20, pady=(0, 4))
+
+        brow = ctk.CTkFrame(self, fg_color="transparent")
+        brow.pack(fill="x", padx=18, pady=(0, 14))
+        self.btn_import = ctk.CTkButton(brow, text=t("import_do"), command=self._start,
+                                        font=ctk.CTkFont("Yu Gothic UI", 13, "bold"),
+                                        fg_color=PINK, hover_color=PINK_HOV, text_color="#ffffff",
+                                        corner_radius=20, height=40, width=150)
+        self.btn_import.pack(side="right", padx=(8, 0))
+        self.btn_close = ctk.CTkButton(brow, text=t("import_close"), command=self._close,
+                                       font=ctk.CTkFont("Yu Gothic UI", 13), fg_color="transparent",
+                                       hover_color=GHOST_HOV, text_color=TXT_MUT, border_width=1,
+                                       border_color=GHOST_BD, corner_radius=20, height=40, width=110)
+        self.btn_close.pack(side="right")
+
+        self.transient(parent)
+        self.protocol("WM_DELETE_WINDOW", self._close)
+        self.after(60, self._post_init)
+
+    def _post_init(self):
+        try:
+            self.lift()
+            self.focus_force()
+            _ico = os.path.join(os.path.dirname(os.path.abspath(__file__)), "modecole.ico")
+            if os.path.isfile(_ico):
+                self.iconbitmap(_ico)
+        except Exception:
+            pass
+
+    def _add_row(self, parent, m):
+        row = ctk.CTkFrame(parent, fg_color="transparent")
+        row.pack(fill="x", padx=6, pady=3)
+        var = tk.BooleanVar(value=False)
+        ctk.CTkCheckBox(row, text="", variable=var, width=24, fg_color=PINK,
+                        hover_color=PINK_HOV, border_color=GHOST_BD,
+                        checkmark_color="#ffffff").pack(side="left", padx=(2, 6))
+        status_lbl = ctk.CTkLabel(row, text="", font=ctk.CTkFont("Yu Gothic UI", 11),
+                                  text_color=TXT_MUT, width=90, anchor="w")
+        status_lbl.pack(side="right", padx=(6, 2))
+        name_var = tk.StringVar(value=m["suggested"])
+        ctk.CTkEntry(row, textvariable=name_var, width=200, height=30,
+                     font=ctk.CTkFont("Consolas", 11), fg_color=WIN_BG, border_color=BORDER,
+                     text_color=TXT, corner_radius=8).pack(side="right", padx=(6, 0))
+        label = f"{m['repo']}  /  {m['filename']}   ({fmt_size(m['size'])})"
+        if m["suggested"] in self.existing:
+            label += "   ⚠" + t("import_already")
+        ctk.CTkLabel(row, text=label, font=ctk.CTkFont("Yu Gothic UI", 11), text_color=TXT,
+                     anchor="w", justify="left").pack(side="left", fill="x", expand=True)
+        self.rows.append({"data": m, "var": var, "name_var": name_var, "status": status_lbl})
+
+    def _set_all(self, val):
+        if self.importing:
+            return
+        for r in self.rows:
+            r["var"].set(val)
+
+    def _start(self):
+        if self.importing:
+            return
+        chosen = [r for r in self.rows if r["var"].get()]
+        if not chosen:
+            messagebox.showwarning(t("import_title"), t("import_nothing_checked"), parent=self)
+            return
+        for r in chosen:
+            if not r["name_var"].get().strip():
+                messagebox.showwarning(t("import_title"), t("import_bad_name"), parent=self)
+                return
+        self.importing = True
+        self.btn_import.configure(state="disabled")
+        self.btn_close.configure(state="disabled")
+        threading.Thread(target=self._worker, args=(chosen,), daemon=True).start()
+
+    def _worker(self, chosen):
+        ok = fail = 0
+        n = len(chosen)
+        for i, r in enumerate(chosen, 1):
+            name = r["name_var"].get().strip()
+            path = r["data"]["path"]
+
+            def prog(status, i=i, name=name, r=r):
+                self.after(0, lambda: self.status_lbl.configure(
+                    text=t("import_progress", i=i, n=n, name=name, status=status), text_color=LAV_TXT))
+                self.after(0, lambda: r["status"].configure(text=status, text_color=LAV_TXT))
+
+            try:
+                ollama_import_gguf(name, path, on_progress=prog)
+                ok += 1
+                self.after(0, lambda r=r: r["status"].configure(text=t("import_row_done"),
+                                                                text_color=OK_GREEN))
+            except Exception as e:
+                fail += 1
+                msg = str(e)
+                self.after(0, lambda r=r, msg=msg: r["status"].configure(
+                    text=t("import_row_fail", e=msg[:24]), text_color=RED))
+        self.after(0, lambda: self._finish(ok, fail))
+
+    def _finish(self, ok, fail):
+        self.importing = False
+        self.btn_close.configure(state="normal")
+        self.btn_import.configure(state="normal")
+        self.status_lbl.configure(text=t("import_finished", ok=ok, fail=fail),
+                                  text_color=OK_GREEN if fail == 0 else WARN_AMBER)
+        if self.on_done:
+            self.on_done(ok)
+
+    def _close(self):
+        if self.importing:
+            return
+        self.destroy()
+
+
 def copy_suggest(name):
     """コピー/派生のたたき台名（元の名前の末尾に -copy）。"""
     return f"{name}-copy"
@@ -884,6 +1249,10 @@ class App:
                      text_color=LAV_TXT).pack(side="left")
         self.count_lbl = ctk.CTkLabel(lh, text="", font=self.f_mut, text_color=TXT_MUT)
         self.count_lbl.pack(side="left", padx=8)
+        ctk.CTkButton(lh, text=t("import_button"), command=self.cmd_import_lmstudio,
+                      font=self.f_mut, fg_color="transparent", hover_color=LAV_HOV,
+                      text_color=LAV_TXT, border_width=1, border_color=LAV,
+                      corner_radius=14, height=28, width=98).pack(side="right")
         ctk.CTkLabel(left_panel, text=t("legend_hint"), font=self.f_mut,
                      text_color=TXT_MUT, anchor="w").pack(fill="x", pady=(0, 4))
         self.list_frame = ctk.CTkScrollableFrame(left_panel, fg_color=CARD, corner_radius=14,
@@ -990,6 +1359,21 @@ class App:
 
     def _model_names(self):
         return [m["name"] for m in self.models]
+
+    def cmd_import_lmstudio(self):
+        models = scan_lmstudio_models()
+        if models is None:
+            messagebox.showwarning(t("import_title"), t("import_no_folder"))
+            return
+        if not models:
+            messagebox.showinfo(t("import_title"), t("import_none_found"))
+            return
+        ImportDialog(self.root, models, set(self._model_names()), on_done=self._after_import)
+
+    def _after_import(self, ok):
+        if ok:
+            self.set_status(t("import_status_done", ok=ok), OK_GREEN)
+        self.refresh()
 
     def refresh(self):
         self.set_status(t("status_loading"), WARN_AMBER)
